@@ -1,22 +1,43 @@
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useState,
+} from 'react'
 import './App.css'
 import {
   supabase,
   supabaseConfigError,
 } from './lib/supabase'
+import BinToBinPage from './pages/BinToBinPage'
+import DashboardPage from './pages/DashboardPage'
 
 function App() {
-  const [session, setSession] = useState(null)
+  const [session, setSession] =
+    useState(null)
+
   const [initializing, setInitializing] =
     useState(true)
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] =
+  const [email, setEmail] =
+    useState('')
+
+  const [password, setPassword] =
+    useState('')
+
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false)
+
+  const [loading, setLoading] =
     useState(false)
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] =
+    useState('')
+
+  const [
+    currentPage,
+    setCurrentPage,
+  ] = useState('dashboard')
 
   useEffect(() => {
     if (!supabase) {
@@ -28,7 +49,9 @@ function App() {
 
     const restoreSession = async () => {
       const {
-        data: { session: currentSession },
+        data: {
+          session: currentSession,
+        },
       } = await supabase.auth.getSession()
 
       if (active) {
@@ -46,6 +69,10 @@ function App() {
         if (active) {
           setSession(currentSession)
           setInitializing(false)
+
+          if (!currentSession) {
+            setCurrentPage('dashboard')
+          }
         }
       },
     )
@@ -87,7 +114,9 @@ function App() {
           'invalid login credentials',
         )
       ) {
-        setError('Email atau password salah.')
+        setError(
+          'Email atau password salah.',
+        )
       } else {
         setError(loginError.message)
       }
@@ -105,6 +134,8 @@ function App() {
 
     if (logoutError) {
       setError('Logout gagal.')
+    } else {
+      setCurrentPage('dashboard')
     }
 
     setLoading(false)
@@ -114,7 +145,10 @@ function App() {
     return (
       <main className="page-center">
         <section className="message-card">
-          <h1>Konfigurasi Belum Lengkap</h1>
+          <h1>
+            Konfigurasi Belum Lengkap
+          </h1>
+
           <p>{supabaseConfigError}</p>
         </section>
       </main>
@@ -126,81 +160,59 @@ function App() {
       <main className="page-center">
         <section className="message-card">
           <div className="spinner" />
-          <p>Memuat BCL Warehouse WMS...</p>
+
+          <p>
+            Memuat BCL Warehouse WMS...
+          </p>
         </section>
       </main>
     )
   }
 
   if (session) {
+    if (currentPage === 'bin-to-bin') {
+      return (
+        <BinToBinPage
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage('dashboard')
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
     return (
-      <main className="dashboard-page">
-        <header className="dashboard-header">
-          <div>
-            <p className="small-label">
-              BCL Warehouse WMS
-            </p>
-            <h1>Dashboard Warehouse</h1>
-          </div>
-
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={loading}
-            onClick={handleLogout}
-          >
-            {loading ? 'Keluar...' : 'Logout'}
-          </button>
-        </header>
-
-        <section className="dashboard-content">
-          <article className="welcome-card">
-            <p>Login berhasil</p>
-            <h2>{session.user.email}</h2>
-          </article>
-
-          <div className="menu-grid">
-            <article className="menu-card">
-              <div className="menu-icon">BT</div>
-              <h3>Bin to Bin</h3>
-              <p>
-                Riwayat perpindahan stok antar
-                lokasi.
-              </p>
-            </article>
-
-            <article className="menu-card">
-              <div className="menu-icon">SC</div>
-              <h3>Stock Count</h3>
-              <p>
-                Hasil perhitungan dan selisih stok.
-              </p>
-            </article>
-          </div>
-
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-        </section>
-      </main>
+      <DashboardPage
+        session={session}
+        loading={loading}
+        error={error}
+        onLogout={handleLogout}
+        onOpenBinToBin={() =>
+          setCurrentPage('bin-to-bin')
+        }
+      />
     )
   }
 
   return (
     <main className="login-page">
       <section className="login-card">
-        <div className="logo-box">BC</div>
+        <div className="logo-box">
+          BC
+        </div>
 
         <h1>BCL Warehouse WMS</h1>
 
         <p className="subtitle">
-          Login untuk membuka dashboard warehouse
+          Login untuk membuka dashboard
+          warehouse
         </p>
 
         <form onSubmit={handleLogin}>
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">
+            Email
+          </label>
 
           <input
             id="email"
@@ -231,7 +243,9 @@ function App() {
               autoComplete="current-password"
               disabled={loading}
               onChange={(event) =>
-                setPassword(event.target.value)
+                setPassword(
+                  event.target.value,
+                )
               }
             />
 
