@@ -9,6 +9,7 @@ import {
 } from './lib/supabase'
 import BinToBinPage from './pages/BinToBinPage'
 import DashboardPage from './pages/DashboardPage'
+import StockCountPage from './pages/StockCountPage'
 
 function App() {
   const [session, setSession] =
@@ -52,7 +53,8 @@ function App() {
         data: {
           session: currentSession,
         },
-      } = await supabase.auth.getSession()
+      } =
+        await supabase.auth.getSession()
 
       if (active) {
         setSession(currentSession)
@@ -64,18 +66,21 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        if (active) {
-          setSession(currentSession)
-          setInitializing(false)
+    } =
+      supabase.auth.onAuthStateChange(
+        (_event, currentSession) => {
+          if (active) {
+            setSession(currentSession)
+            setInitializing(false)
 
-          if (!currentSession) {
-            setCurrentPage('dashboard')
+            if (!currentSession) {
+              setCurrentPage(
+                'dashboard',
+              )
+            }
           }
-        }
-      },
-    )
+        },
+      )
 
     return () => {
       active = false
@@ -92,7 +97,9 @@ function App() {
     }
 
     if (!password) {
-      setError('Password wajib diisi.')
+      setError(
+        'Password wajib diisi.',
+      )
       return
     }
 
@@ -100,14 +107,16 @@ function App() {
     setError('')
 
     const { error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
+      await supabase.auth
+        .signInWithPassword({
+          email: email.trim(),
+          password,
+        })
 
     if (loginError) {
       const errorMessage =
-        loginError.message.toLowerCase()
+        loginError.message
+          .toLowerCase()
 
       if (
         errorMessage.includes(
@@ -149,7 +158,9 @@ function App() {
             Konfigurasi Belum Lengkap
           </h1>
 
-          <p>{supabaseConfigError}</p>
+          <p>
+            {supabaseConfigError}
+          </p>
         </section>
       </main>
     )
@@ -170,12 +181,32 @@ function App() {
   }
 
   if (session) {
-    if (currentPage === 'bin-to-bin') {
+    if (
+      currentPage === 'bin-to-bin'
+    ) {
       return (
         <BinToBinPage
           loadingLogout={loading}
           onBack={() =>
-            setCurrentPage('dashboard')
+            setCurrentPage(
+              'dashboard',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (
+      currentPage === 'stock-count'
+    ) {
+      return (
+        <StockCountPage
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'dashboard',
+            )
           }
           onLogout={handleLogout}
         />
@@ -189,7 +220,14 @@ function App() {
         error={error}
         onLogout={handleLogout}
         onOpenBinToBin={() =>
-          setCurrentPage('bin-to-bin')
+          setCurrentPage(
+            'bin-to-bin',
+          )
+        }
+        onOpenStockCount={() =>
+          setCurrentPage(
+            'stock-count',
+          )
         }
       />
     )
@@ -202,7 +240,9 @@ function App() {
           BC
         </div>
 
-        <h1>BCL Warehouse WMS</h1>
+        <h1>
+          BCL Warehouse WMS
+        </h1>
 
         <p className="subtitle">
           Login untuk membuka dashboard
@@ -222,7 +262,9 @@ function App() {
             autoComplete="email"
             disabled={loading}
             onChange={(event) =>
-              setEmail(event.target.value)
+              setEmail(
+                event.target.value,
+              )
             }
           />
 
@@ -254,7 +296,8 @@ function App() {
               type="button"
               onClick={() =>
                 setShowPassword(
-                  (current) => !current,
+                  (current) =>
+                    !current,
                 )
               }
             >

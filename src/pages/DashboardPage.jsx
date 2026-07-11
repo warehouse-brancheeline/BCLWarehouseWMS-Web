@@ -4,6 +4,7 @@ function DashboardPage({
   error,
   onLogout,
   onOpenBinToBin,
+  onOpenStockCount,
 }) {
   return (
     <main className="dashboard-page">
@@ -13,7 +14,9 @@ function DashboardPage({
             BCL Warehouse WMS
           </p>
 
-          <h1>Dashboard Warehouse</h1>
+          <h1>
+            Dashboard Warehouse
+          </h1>
         </div>
 
         <button
@@ -22,7 +25,9 @@ function DashboardPage({
           disabled={loading}
           onClick={onLogout}
         >
-          {loading ? 'Keluar...' : 'Logout'}
+          {loading
+            ? 'Keluar...'
+            : 'Logout'}
         </button>
       </header>
 
@@ -38,32 +43,33 @@ function DashboardPage({
             type="button"
             onClick={onOpenBinToBin}
           >
-            <div className="menu-icon">BT</div>
+            <div className="menu-icon">
+              BT
+            </div>
 
             <h3>Bin to Bin</h3>
 
             <p>
-              Lihat riwayat perpindahan stok antar
-              lokasi.
+              Lihat riwayat perpindahan stok
+              antar lokasi.
             </p>
           </button>
 
           <button
-            className="menu-card menu-card-coming"
+            className="menu-card menu-card-button"
             type="button"
-            disabled
+            onClick={onOpenStockCount}
           >
-            <div className="menu-icon">SC</div>
+            <div className="menu-icon">
+              SC
+            </div>
 
             <h3>Stock Count</h3>
 
             <p>
-              Hasil perhitungan dan selisih stok.
+              Lihat hasil perhitungan fisik
+              dan selisih stok.
             </p>
-
-            <span className="coming-label">
-              Segera dibuat
-            </span>
           </button>
         </div>
 

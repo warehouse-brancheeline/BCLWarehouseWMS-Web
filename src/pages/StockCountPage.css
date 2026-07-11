@@ -1,0 +1,276 @@
+.stock-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stock-summary-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.stock-summary-card {
+  padding: 22px;
+  border: 1px solid #e1e6f0;
+  border-radius: 17px;
+  background: #ffffff;
+}
+
+.stock-summary-card span {
+  display: block;
+  margin-bottom: 10px;
+  color: #747d90;
+  font-size: 13px;
+}
+
+.stock-summary-card strong {
+  color: #172038;
+  font-size: 27px;
+}
+
+.stock-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.stock-toolbar h2 {
+  margin: 0 0 5px;
+}
+
+.stock-toolbar p {
+  margin: 0;
+  color: #747d90;
+}
+
+.stock-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stock-search {
+  width: 330px;
+  background: #ffffff;
+}
+
+.stock-refresh-button,
+.stock-download-button,
+.open-detail-button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 11px;
+  color: #ffffff;
+  background: #315ee8;
+  font-weight: 800;
+}
+
+.stock-download-button {
+  background: #18794e;
+}
+
+.open-detail-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.stock-table-card {
+  overflow: hidden;
+  border: 1px solid #e1e6f0;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.stock-table-scroll {
+  overflow-x: auto;
+}
+
+.stock-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stock-session-table {
+  min-width: 1050px;
+}
+
+.stock-detail-table {
+  min-width: 1300px;
+}
+
+.stock-table th,
+.stock-table td {
+  padding: 15px 16px;
+  border-bottom: 1px solid #edf0f5;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.stock-table th {
+  color: #626c80;
+  background: #f8f9fc;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.stock-table tbody tr:hover {
+  background: #f8faff;
+}
+
+.stock-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.transaction-number-button {
+  padding: 0;
+  border: 0;
+  color: #315ee8;
+  background: transparent;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.stock-bin-label {
+  display: inline-block;
+  padding: 6px 9px;
+  border-radius: 8px;
+  color: #234cc6;
+  background: #edf2ff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stock-status-label {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.stock-status-draft {
+  color: #626c80;
+  background: #eef1f6;
+}
+
+.stock-status-progress {
+  color: #9a6200;
+  background: #fff5d8;
+}
+
+.stock-status-submitted {
+  color: #234cc6;
+  background: #edf2ff;
+}
+
+.stock-status-reviewed {
+  color: #7047a3;
+  background: #f3ecff;
+}
+
+.stock-status-approved {
+  color: #18794e;
+  background: #eaf8f1;
+}
+
+.stock-status-rejected {
+  color: #ad2626;
+  background: #fff0f0;
+}
+
+.stock-status-adjusted {
+  color: #075f70;
+  background: #e8f8fa;
+}
+
+.variance-positive {
+  color: #18794e !important;
+}
+
+.variance-negative {
+  color: #c52929 !important;
+}
+
+.variance-zero {
+  color: #626c80 !important;
+}
+
+.stock-empty-table {
+  padding: 46px !important;
+  color: #747d90;
+  text-align: center !important;
+}
+
+.transaction-info-card {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 22px;
+  border: 1px solid #dce3f0;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.transaction-info-card div {
+  min-width: 0;
+}
+
+.transaction-info-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #747d90;
+  font-size: 12px;
+}
+
+.transaction-info-card strong {
+  display: block;
+  overflow: hidden;
+  color: #172038;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1000px) {
+  .stock-summary-grid,
+  .transaction-info-card {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .stock-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stock-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stock-search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .stock-summary-grid,
+  .transaction-info-card {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}

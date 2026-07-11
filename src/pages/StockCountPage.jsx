@@ -4,6 +4,10 @@ import {
   useMemo,
   useState,
 } from 'react'
+import {
+  utils,
+  writeFileXLSX,
+} from 'xlsx'
 import { supabase } from '../lib/supabase'
 import './StockCountPage.css'
 
@@ -27,33 +31,32 @@ function pickValue(row, keys, fallback = '') {
   return fallback
 }
 
+function toNumber(value) {
+  const result = Number(value)
+  return Number.isNaN(result) ? 0 : result
+}
+
 function formatDate(value) {
   if (!value) {
     return '-'
   }
 
-  const parsedDate = new Date(value)
+  const date = new Date(value)
 
-  if (Number.isNaN(parsedDate.getTime())) {
+  if (Number.isNaN(date.getTime())) {
     return String(value)
   }
 
   return new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(parsedDate)
+  }).format(date)
 }
 
 function formatQty(value) {
-  const numberValue = Number(value)
-
-  if (Number.isNaN(numberValue)) {
-    return value || '0'
-  }
-
   return new Intl.NumberFormat('id-ID', {
     maximumFractionDigits: 2,
-  }).format(numberValue)
+  }).format(toNumber(value))
 }
 
 function normalizeStatus(value) {
@@ -63,37 +66,37 @@ function normalizeStatus(value) {
 }
 
 function getStatusClass(status) {
-  const normalized = normalizeStatus(status)
+  const value = normalizeStatus(status)
 
-  if (normalized === 'DRAFT') {
+  if (value === 'DRAFT') {
     return 'stock-status-draft'
   }
 
-  if (normalized === 'IN_PROGRESS') {
+  if (value === 'IN_PROGRESS') {
     return 'stock-status-progress'
   }
 
-  if (normalized === 'APPROVED') {
+  if (value === 'APPROVED') {
     return 'stock-status-approved'
   }
 
-  if (normalized === 'REJECTED') {
+  if (value === 'REJECTED') {
     return 'stock-status-rejected'
   }
 
-  if (normalized === 'ADJUSTED') {
-    return 'stock-status-adjusted'
+  if (value === 'REVIEWED') {
+    return 'stock-status-reviewed'
   }
 
-  if (normalized === 'REVIEWED') {
-    return 'stock-status-reviewed'
+  if (value === 'ADJUSTED') {
+    return 'stock-status-adjusted'
   }
 
   return 'stock-status-submitted'
 }
 
 function getVarianceClass(value) {
-  const numberValue = Number(value) || 0
+  const numberValue = toNumber(value)
 
   if (numberValue > 0) {
     return 'variance-positive'
@@ -106,103 +109,66 @@ function getVarianceClass(value) {
   return 'variance-zero'
 }
 
+function safeFilename(value) {
+  return String(value || 'Stock-Count')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '_')
+}
+
 function StockCountPage({
   loadingLogout,
   onBack,
   onLogout,
 }) {
-  const [rows, setRows] = useState([])
-  const [sessionTotal, setSessionTotal] =
-    useState(0)
+  const [sessions, setSessions] = useState([])
+  const [selectedSessionId, setSelectedSessionId] =
+    useState(null)
 
-  const [search, setSearch] =
-    useState('')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const [statusFilter, setStatusFilter] =
-    useState('ALL')
-
-  const [loading, setLoading] =
-    useState(true)
-
-  const [error, setError] =
-    useState('')
-
-  const loadHistory = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
 
     try {
       const [
-        countResult,
+        sessionResult,
         itemResult,
       ] = await Promise.all([
         supabase
           .from('stock_count_sessions')
           .select('*')
-          .limit(300),
+          .limit(1000),
 
         supabase
           .from('stock_count_items')
           .select('*')
-          .limit(3000),
+          .limit(10000),
       ])
 
-      if (countResult.error) {
-        throw countResult.error
+      if (sessionResult.error) {
+        throw sessionResult.error
       }
 
       if (itemResult.error) {
         throw itemResult.error
       }
 
-      const counts =
-        countResult.data ?? []
+      const sessionRows =
+        sessionResult.data ?? []
 
-      const allItems =
+      const itemRows =
         itemResult.data ?? []
-
-      setSessionTotal(counts.length)
-
-      const countIds = new Set(
-        counts.map((count) =>
-          String(
-            pickValue(
-              count,
-              ['id'],
-              '',
-            ),
-          ),
-        ),
-      )
-
-      const items = allItems.filter((item) => {
-        const countId = String(
-          pickValue(
-            item,
-            [
-              'stock_count_session_id',
-              'stock_count_id',
-              'count_id',
-              'session_id',
-            ],
-            '',
-          ),
-        )
-
-        return countIds.has(countId)
-      })
 
       const binIds = new Set()
       const skuIds = new Set()
-      const userIds = new Set()
 
-      items.forEach((item) => {
+      itemRows.forEach((item) => {
         const binId = pickValue(
           item,
-          [
-            'bin_id',
-            'location_id',
-          ],
+          ['bin_id', 'location_id'],
           '',
         )
 
@@ -225,32 +191,12 @@ function StockCountPage({
         }
       })
 
-      counts.forEach((count) => {
-        const userId = pickValue(
-          count,
-          [
-            'counted_by',
-            'created_by',
-            'user_id',
-            'submitted_by',
-          ],
-          '',
-        )
-
-        if (userId) {
-          userIds.add(String(userId))
-        }
-      })
-
       const binQuery =
         binIds.size > 0
           ? supabase
               .from('bins')
               .select('*')
-              .in(
-                'id',
-                Array.from(binIds),
-              )
+              .in('id', Array.from(binIds))
           : Promise.resolve({
               data: [],
               error: null,
@@ -261,28 +207,16 @@ function StockCountPage({
           ? supabase
               .from('skus')
               .select('*')
-              .in(
-                'id',
-                Array.from(skuIds),
-              )
+              .in('id', Array.from(skuIds))
           : Promise.resolve({
               data: [],
               error: null,
             })
 
-      const profileQuery =
-        userIds.size > 0
-          ? supabase
-              .from('profiles')
-              .select('*')
-              .in(
-                'id',
-                Array.from(userIds),
-              )
-          : Promise.resolve({
-              data: [],
-              error: null,
-            })
+      const profileQuery = supabase
+        .from('profiles')
+        .select('*')
+        .limit(1000)
 
       const [
         binResult,
@@ -304,337 +238,375 @@ function StockCountPage({
 
       if (profileResult.error) {
         console.warn(
-          'Profile tidak dapat dimuat:',
+          'Profiles gagal dimuat:',
           profileResult.error,
         )
       }
 
       const binsById = new Map(
-        (binResult.data ?? []).map(
-          (bin) => [
-            String(bin.id),
-            bin,
-          ],
-        ),
+        (binResult.data ?? []).map((bin) => [
+          String(bin.id),
+          bin,
+        ]),
       )
 
       const skusById = new Map(
-        (skuResult.data ?? []).map(
-          (sku) => [
-            String(sku.id),
-            sku,
-          ],
-        ),
+        (skuResult.data ?? []).map((sku) => [
+          String(sku.id),
+          sku,
+        ]),
       )
 
       const profilesById = new Map()
 
       ;(profileResult.data ?? []).forEach(
         (profile) => {
-          const profileId = String(
+          const possibleIds = [
+            profile.id,
+            profile.user_id,
+            profile.auth_user_id,
+          ]
+
+          possibleIds.forEach((id) => {
+            if (id) {
+              profilesById.set(
+                String(id),
+                profile,
+              )
+            }
+          })
+        },
+      )
+
+      const normalizedItems = itemRows.map(
+        (item) => {
+          const sessionId = String(
             pickValue(
-              profile,
-              ['id', 'user_id'],
+              item,
+              [
+                'stock_count_session_id',
+                'stock_count_id',
+                'count_id',
+                'session_id',
+              ],
               '',
             ),
           )
 
-          if (profileId) {
-            profilesById.set(
-              profileId,
-              profile,
-            )
+          const binId = String(
+            pickValue(
+              item,
+              ['bin_id', 'location_id'],
+              '',
+            ),
+          )
+
+          const skuId = String(
+            pickValue(
+              item,
+              [
+                'sku_id',
+                'item_id',
+                'product_id',
+              ],
+              '',
+            ),
+          )
+
+          const bin = binsById.get(binId)
+          const sku = skusById.get(skuId)
+
+          const systemQty = toNumber(
+            pickValue(
+              item,
+              [
+                'system_qty',
+                'expected_qty',
+                'book_qty',
+                'qty_system',
+                'current_qty',
+              ],
+              0,
+            ),
+          )
+
+          const actualQty = toNumber(
+            pickValue(
+              item,
+              [
+                'actual_qty',
+                'counted_qty',
+                'physical_qty',
+                'qty_actual',
+                'count_qty',
+                'qty',
+              ],
+              0,
+            ),
+          )
+
+          const savedVariance = pickValue(
+            item,
+            [
+              'variance',
+              'difference',
+              'variance_qty',
+              'difference_qty',
+            ],
+            '',
+          )
+
+          const variance =
+            savedVariance === ''
+              ? actualQty - systemQty
+              : toNumber(savedVariance)
+
+          return {
+            id: pickValue(
+              item,
+              ['id'],
+              crypto.randomUUID(),
+            ),
+
+            sessionId,
+
+            binCode: pickValue(
+              bin,
+              [
+                'bin_code',
+                'code',
+                'location_code',
+                'name',
+              ],
+              pickValue(
+                item,
+                [
+                  'bin_code',
+                  'location_code',
+                  'bin',
+                  'location',
+                ],
+                '-',
+              ),
+            ),
+
+            skuCode: pickValue(
+              sku,
+              [
+                'sku_code',
+                'code',
+                'sku',
+              ],
+              pickValue(
+                item,
+                [
+                  'sku_code',
+                  'sku',
+                  'item_code',
+                ],
+                '-',
+              ),
+            ),
+
+            skuName: pickValue(
+              sku,
+              [
+                'sku_name',
+                'name',
+                'description',
+                'product_name',
+              ],
+              pickValue(
+                item,
+                [
+                  'sku_name',
+                  'description',
+                  'product_name',
+                ],
+                '-',
+              ),
+            ),
+
+            systemQty,
+            actualQty,
+            variance,
+
+            notes: pickValue(
+              item,
+              [
+                'notes',
+                'remarks',
+                'note',
+              ],
+              '-',
+            ),
+
+            createdAt: pickValue(
+              item,
+              [
+                'created_at',
+                'counted_at',
+                'updated_at',
+              ],
+              '',
+            ),
           }
         },
       )
 
-      const itemsByCount = new Map()
+      const itemsBySession = new Map()
 
-      items.forEach((item) => {
-        const countId = String(
-          pickValue(
-            item,
-            [
-              'stock_count_session_id',
-              'stock_count_id',
-              'count_id',
-              'session_id',
-            ],
-            '',
-          ),
-        )
-
-        if (!itemsByCount.has(countId)) {
-          itemsByCount.set(countId, [])
+      normalizedItems.forEach((item) => {
+        if (
+          !itemsBySession.has(item.sessionId)
+        ) {
+          itemsBySession.set(
+            item.sessionId,
+            [],
+          )
         }
 
-        itemsByCount
-          .get(countId)
+        itemsBySession
+          .get(item.sessionId)
           .push(item)
       })
 
-      const normalizedRows = []
+      const normalizedSessions =
+        sessionRows.map((session) => {
+          const sessionId = String(
+            pickValue(
+              session,
+              ['id'],
+              '',
+            ),
+          )
 
-      counts.forEach((count) => {
-        const countId = String(
-          pickValue(
-            count,
-            ['id'],
-            '',
-          ),
-        )
+          const items =
+            itemsBySession.get(sessionId) ?? []
 
-        const countItems =
-          itemsByCount.get(countId) ?? []
+          const userId = String(
+            pickValue(
+              session,
+              [
+                'created_by',
+                'user_id',
+                'counted_by',
+                'submitted_by',
+                'staff_id',
+              ],
+              '',
+            ),
+          )
 
-        const userId = String(
-          pickValue(
-            count,
+          const profile =
+            profilesById.get(userId)
+
+          const transactionNumber =
+            pickValue(
+              session,
+              [
+                'transaction_number',
+                'count_number',
+                'session_number',
+                'stock_count_number',
+                'reference_no',
+                'document_number',
+              ],
+              sessionId
+                ? `SC-${sessionId
+                    .slice(0, 8)
+                    .toUpperCase()}`
+                : '-',
+            )
+
+          const staffName = pickValue(
+            session,
             [
-              'counted_by',
-              'created_by',
-              'user_id',
-              'submitted_by',
+              'staff_name',
+              'created_by_name',
+              'counter_name',
+              'counted_by_name',
+              'user_name',
+              'user_email',
             ],
-            '',
-          ),
-        )
+            pickValue(
+              profile,
+              [
+                'full_name',
+                'name',
+                'display_name',
+                'email',
+              ],
+              userId
+                ? userId.slice(0, 8)
+                : '-',
+            ),
+          )
 
-        const profile =
-          profilesById.get(userId)
-
-        const countNumber = pickValue(
-          count,
-          [
-            'count_number',
-            'stock_count_number',
-            'reference_no',
-            'document_number',
-            'session_number',
-          ],
-          countId
-            ? countId.slice(0, 8)
-            : '-',
-        )
-
-        const rowsToCreate =
-          countItems.length > 0
-            ? countItems
-            : [null]
-
-        rowsToCreate.forEach(
-          (item, index) => {
-            const binId = String(
-              pickValue(
-                item,
-                [
-                  'bin_id',
-                  'location_id',
-                ],
-                '',
-              ),
+          const totalSystemQty =
+            items.reduce(
+              (total, item) =>
+                total + item.systemQty,
+              0,
             )
 
-            const skuId = String(
-              pickValue(
-                item,
-                [
-                  'sku_id',
-                  'item_id',
-                  'product_id',
-                ],
-                '',
-              ),
+          const totalActualQty =
+            items.reduce(
+              (total, item) =>
+                total + item.actualQty,
+              0,
             )
 
-            const bin =
-              binsById.get(binId)
+          const totalVariance =
+            items.reduce(
+              (total, item) =>
+                total + item.variance,
+              0,
+            )
 
-            const sku =
-              skusById.get(skuId)
+          return {
+            id: sessionId,
+            transactionNumber,
+            staffName,
 
-            const systemQty = Number(
+            status: normalizeStatus(
               pickValue(
-                item,
-                [
-                  'system_qty',
-                  'expected_qty',
-                  'book_qty',
-                  'qty_system',
-                  'current_qty',
-                ],
-                0,
+                session,
+                ['status'],
+                'SUBMITTED',
               ),
-            ) || 0
+            ),
 
-            const actualQty = Number(
-              pickValue(
-                item,
-                [
-                  'actual_qty',
-                  'counted_qty',
-                  'physical_qty',
-                  'qty_actual',
-                  'count_qty',
-                  'qty',
-                ],
-                0,
-              ),
-            ) || 0
+            notes: pickValue(
+              session,
+              [
+                'notes',
+                'remarks',
+                'note',
+              ],
+              '-',
+            ),
 
-            const savedVariance =
-              pickValue(
-                item,
-                [
-                  'variance',
-                  'difference',
-                  'variance_qty',
-                  'difference_qty',
-                ],
-                '',
-              )
+            createdAt: pickValue(
+              session,
+              [
+                'submitted_at',
+                'created_at',
+                'count_date',
+                'updated_at',
+              ],
+              '',
+            ),
 
-            const variance =
-              savedVariance === ''
-                ? actualQty - systemQty
-                : Number(savedVariance) || 0
+            itemCount: items.length,
+            totalSystemQty,
+            totalActualQty,
+            totalVariance,
+            items,
+          }
+        })
 
-            normalizedRows.push({
-              id:
-                pickValue(
-                  item,
-                  ['id'],
-                  '',
-                ) ||
-                `${countId}-${index}`,
-
-              countNumber,
-
-              binCode: pickValue(
-                bin,
-                [
-                  'bin_code',
-                  'code',
-                  'location_code',
-                  'name',
-                ],
-                pickValue(
-                  item,
-                  [
-                    'bin_code',
-                    'location_code',
-                    'bin',
-                    'location',
-                  ],
-                  '-',
-                ),
-              ),
-
-              skuCode: pickValue(
-                sku,
-                [
-                  'sku_code',
-                  'code',
-                  'sku',
-                ],
-                pickValue(
-                  item,
-                  [
-                    'sku_code',
-                    'sku',
-                    'item_code',
-                  ],
-                  '-',
-                ),
-              ),
-
-              skuName: pickValue(
-                sku,
-                [
-                  'sku_name',
-                  'name',
-                  'description',
-                  'product_name',
-                ],
-                pickValue(
-                  item,
-                  [
-                    'sku_name',
-                    'description',
-                    'product_name',
-                  ],
-                  '-',
-                ),
-              ),
-
-              systemQty,
-              actualQty,
-              variance,
-
-              status: normalizeStatus(
-                pickValue(
-                  count,
-                  ['status'],
-                  'SUBMITTED',
-                ),
-              ),
-
-              notes: pickValue(
-                item,
-                [
-                  'notes',
-                  'remarks',
-                  'note',
-                ],
-                pickValue(
-                  count,
-                  [
-                    'notes',
-                    'remarks',
-                    'note',
-                  ],
-                  '-',
-                ),
-              ),
-
-              counterName: pickValue(
-                profile,
-                [
-                  'full_name',
-                  'name',
-                  'display_name',
-                  'email',
-                ],
-                pickValue(
-                  count,
-                  [
-                    'counted_by_name',
-                    'created_by_name',
-                    'user_name',
-                    'user_email',
-                  ],
-                  userId
-                    ? userId.slice(0, 8)
-                    : '-',
-                ),
-              ),
-
-              createdAt: pickValue(
-                count,
-                [
-                  'submitted_at',
-                  'created_at',
-                  'count_date',
-                  'updated_at',
-                ],
-                '',
-              ),
-            })
-          },
-        )
-      })
-
-      normalizedRows.sort((a, b) => {
+      normalizedSessions.sort((a, b) => {
         const dateA =
           new Date(a.createdAt)
             .getTime() || 0
@@ -646,16 +618,15 @@ function StockCountPage({
         return dateB - dateA
       })
 
-      setRows(normalizedRows)
+      setSessions(normalizedSessions)
     } catch (loadError) {
       console.error(loadError)
 
-      setRows([])
-      setSessionTotal(0)
+      setSessions([])
 
       setError(
         loadError?.message ||
-          'Riwayat Stock Count gagal dimuat.',
+          'Data Stock Count gagal dimuat.',
       )
     } finally {
       setLoading(false)
@@ -663,80 +634,430 @@ function StockCountPage({
   }, [])
 
   useEffect(() => {
-    loadHistory()
-  }, [loadHistory])
+    loadData()
+  }, [loadData])
 
-  const availableStatuses = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          rows.map((row) =>
-            normalizeStatus(row.status),
-          ),
-        ),
-      ).sort(),
-    [rows],
-  )
-
-  const filteredRows = useMemo(() => {
+  const filteredSessions = useMemo(() => {
     const keyword =
       search.trim().toLowerCase()
 
-    return rows.filter((row) => {
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        normalizeStatus(row.status) ===
-          statusFilter
+    if (!keyword) {
+      return sessions
+    }
 
-      if (!matchesStatus) {
-        return false
-      }
-
-      if (!keyword) {
-        return true
-      }
-
-      return [
-        row.countNumber,
-        row.binCode,
-        row.skuCode,
-        row.skuName,
-        row.status,
-        row.notes,
-        row.counterName,
+    return sessions.filter((session) =>
+      [
+        session.transactionNumber,
+        session.staffName,
+        session.status,
+        session.notes,
       ].some((value) =>
         String(value)
           .toLowerCase()
           .includes(keyword),
+      ),
+    )
+  }, [sessions, search])
+
+  const selectedSession = useMemo(
+    () =>
+      sessions.find(
+        (session) =>
+          session.id === selectedSessionId,
+      ) ?? null,
+    [sessions, selectedSessionId],
+  )
+
+  const totalItems = useMemo(
+    () =>
+      sessions.reduce(
+        (total, session) =>
+          total + session.itemCount,
+        0,
+      ),
+    [sessions],
+  )
+
+  const totalStaff = useMemo(
+    () =>
+      new Set(
+        sessions
+          .map((session) =>
+            session.staffName.trim(),
+          )
+          .filter(
+            (name) =>
+              name &&
+              name !== '-',
+          ),
+      ).size,
+    [sessions],
+  )
+
+  const downloadExcel = () => {
+    if (!selectedSession) {
+      return
+    }
+
+    const summaryRows = [
+      ['BCL Warehouse WMS'],
+      ['Laporan Stock Count'],
+      [],
+      [
+        'Nomor Transaksi',
+        selectedSession.transactionNumber,
+      ],
+      [
+        'Staff Penghitung',
+        selectedSession.staffName,
+      ],
+      [
+        'Tanggal',
+        formatDate(
+          selectedSession.createdAt,
+        ),
+      ],
+      [
+        'Status',
+        selectedSession.status,
+      ],
+      [
+        'Total Baris',
+        selectedSession.itemCount,
+      ],
+      [
+        'Total Qty Sistem',
+        selectedSession.totalSystemQty,
+      ],
+      [
+        'Total Qty Aktual',
+        selectedSession.totalActualQty,
+      ],
+      [
+        'Total Selisih',
+        selectedSession.totalVariance,
+      ],
+      [
+        'Catatan Sesi',
+        selectedSession.notes,
+      ],
+    ]
+
+    const detailRows =
+      selectedSession.items.map(
+        (item, index) => ({
+          No: index + 1,
+          Lokasi: item.binCode,
+          SKU: item.skuCode,
+          Deskripsi: item.skuName,
+          'Qty Sistem': item.systemQty,
+          'Qty Aktual': item.actualQty,
+          Selisih: item.variance,
+          Catatan: item.notes,
+          'Waktu Input': formatDate(
+            item.createdAt,
+          ),
+        }),
       )
-    })
-  }, [
-    rows,
-    search,
-    statusFilter,
-  ])
 
-  const totalActualQty = useMemo(
-    () =>
-      filteredRows.reduce(
-        (total, row) =>
-          total +
-          (Number(row.actualQty) || 0),
-        0,
-      ),
-    [filteredRows],
-  )
+    const workbook =
+      utils.book_new()
 
-  const totalVariance = useMemo(
-    () =>
-      filteredRows.reduce(
-        (total, row) =>
-          total +
-          (Number(row.variance) || 0),
-        0,
-      ),
-    [filteredRows],
-  )
+    const summarySheet =
+      utils.aoa_to_sheet(summaryRows)
+
+    const detailSheet =
+      utils.json_to_sheet(detailRows)
+
+    summarySheet['!cols'] = [
+      { wch: 24 },
+      { wch: 35 },
+    ]
+
+    detailSheet['!cols'] = [
+      { wch: 7 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 38 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 35 },
+      { wch: 22 },
+    ]
+
+    utils.book_append_sheet(
+      workbook,
+      summarySheet,
+      'Ringkasan',
+    )
+
+    utils.book_append_sheet(
+      workbook,
+      detailSheet,
+      'Detail Stock Count',
+    )
+
+    const filename =
+      `Stock_Count_${safeFilename(
+        selectedSession.transactionNumber,
+      )}.xlsx`
+
+    writeFileXLSX(
+      workbook,
+      filename,
+      {
+        compression: true,
+      },
+    )
+  }
+
+  if (selectedSession) {
+    return (
+      <main className="dashboard-page">
+        <header className="dashboard-header">
+          <div>
+            <p className="small-label">
+              BCL Warehouse WMS
+            </p>
+
+            <h1>
+              Detail Stock Count
+            </h1>
+          </div>
+
+          <div className="stock-header-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() =>
+                setSelectedSessionId(null)
+              }
+            >
+              Daftar Transaksi
+            </button>
+
+            <button
+              className="stock-download-button"
+              type="button"
+              onClick={downloadExcel}
+            >
+              Download Excel
+            </button>
+
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={loadingLogout}
+              onClick={onLogout}
+            >
+              {loadingLogout
+                ? 'Keluar...'
+                : 'Logout'}
+            </button>
+          </div>
+        </header>
+
+        <section className="dashboard-content">
+          <div className="transaction-info-card">
+            <div>
+              <span>Nomor Transaksi</span>
+              <strong>
+                {
+                  selectedSession
+                    .transactionNumber
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>Staff Penghitung</span>
+              <strong>
+                {selectedSession.staffName}
+              </strong>
+            </div>
+
+            <div>
+              <span>Tanggal</span>
+              <strong>
+                {formatDate(
+                  selectedSession.createdAt,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Status</span>
+
+              <strong>
+                <span
+                  className={`stock-status-label ${getStatusClass(
+                    selectedSession.status,
+                  )}`}
+                >
+                  {selectedSession.status}
+                </span>
+              </strong>
+            </div>
+          </div>
+
+          <div className="stock-summary-grid">
+            <article className="stock-summary-card">
+              <span>Total Baris</span>
+              <strong>
+                {
+                  selectedSession
+                    .itemCount
+                }
+              </strong>
+            </article>
+
+            <article className="stock-summary-card">
+              <span>Total Qty Sistem</span>
+              <strong>
+                {formatQty(
+                  selectedSession
+                    .totalSystemQty,
+                )}
+              </strong>
+            </article>
+
+            <article className="stock-summary-card">
+              <span>Total Qty Aktual</span>
+              <strong>
+                {formatQty(
+                  selectedSession
+                    .totalActualQty,
+                )}
+              </strong>
+            </article>
+
+            <article className="stock-summary-card">
+              <span>Total Selisih</span>
+
+              <strong
+                className={getVarianceClass(
+                  selectedSession
+                    .totalVariance,
+                )}
+              >
+                {selectedSession
+                    .totalVariance > 0
+                  ? '+'
+                  : ''}
+
+                {formatQty(
+                  selectedSession
+                    .totalVariance,
+                )}
+              </strong>
+            </article>
+          </div>
+
+          <div className="stock-table-card">
+            <div className="stock-table-scroll">
+              <table className="stock-table stock-detail-table">
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Lokasi</th>
+                    <th>SKU</th>
+                    <th>Deskripsi</th>
+                    <th>Qty Sistem</th>
+                    <th>Qty Aktual</th>
+                    <th>Selisih</th>
+                    <th>Catatan</th>
+                    <th>Waktu Input</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {selectedSession
+                    .items.length === 0 ? (
+                    <tr>
+                      <td
+                        className="stock-empty-table"
+                        colSpan="9"
+                      >
+                        Transaksi ini belum
+                        mempunyai detail item.
+                      </td>
+                    </tr>
+                  ) : (
+                    selectedSession.items.map(
+                      (item, index) => (
+                        <tr key={item.id}>
+                          <td>
+                            {index + 1}
+                          </td>
+
+                          <td>
+                            <span className="stock-bin-label">
+                              {item.binCode}
+                            </span>
+                          </td>
+
+                          <td>
+                            <strong>
+                              {item.skuCode}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {item.skuName}
+                          </td>
+
+                          <td>
+                            {formatQty(
+                              item.systemQty,
+                            )}
+                          </td>
+
+                          <td>
+                            <strong>
+                              {formatQty(
+                                item.actualQty,
+                              )}
+                            </strong>
+                          </td>
+
+                          <td>
+                            <strong
+                              className={getVarianceClass(
+                                item.variance,
+                              )}
+                            >
+                              {item.variance > 0
+                                ? '+'
+                                : ''}
+
+                              {formatQty(
+                                item.variance,
+                              )}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {item.notes}
+                          </td>
+
+                          <td>
+                            {formatDate(
+                              item.createdAt,
+                            )}
+                          </td>
+                        </tr>
+                      ),
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    )
+  }
 
   return (
     <main className="dashboard-page">
@@ -747,7 +1068,7 @@ function StockCountPage({
           </p>
 
           <h1>
-            Riwayat Stock Count
+            Transaksi Stock Count
           </h1>
         </div>
 
@@ -774,40 +1095,32 @@ function StockCountPage({
       </header>
 
       <section className="dashboard-content">
-        <div className="stock-summary-grid">
+        <div className="stock-summary-grid stock-session-summary">
           <article className="stock-summary-card">
-            <span>Total Sesi</span>
+            <span>Total Transaksi</span>
             <strong>
-              {sessionTotal}
+              {sessions.length}
             </strong>
           </article>
 
           <article className="stock-summary-card">
-            <span>Baris Ditampilkan</span>
+            <span>Total Staff</span>
             <strong>
-              {filteredRows.length}
+              {totalStaff}
             </strong>
           </article>
 
           <article className="stock-summary-card">
-            <span>Total Qty Aktual</span>
+            <span>Total Baris Hitungan</span>
             <strong>
-              {formatQty(totalActualQty)}
+              {totalItems}
             </strong>
           </article>
 
           <article className="stock-summary-card">
-            <span>Total Selisih</span>
-
-            <strong
-              className={getVarianceClass(
-                totalVariance,
-              )}
-            >
-              {totalVariance > 0
-                ? '+'
-                : ''}
-              {formatQty(totalVariance)}
+            <span>Hasil Ditampilkan</span>
+            <strong>
+              {filteredSessions.length}
             </strong>
           </article>
         </div>
@@ -815,12 +1128,12 @@ function StockCountPage({
         <div className="stock-toolbar">
           <div>
             <h2>
-              Data Perhitungan Stok
+              Daftar Nomor Transaksi
             </h2>
 
             <p>
-              Data yang telah dikirim dari
-              aplikasi Android ke Supabase.
+              Klik nomor transaksi untuk
+              melihat seluruh detail hitungan.
             </p>
           </div>
 
@@ -829,7 +1142,7 @@ function StockCountPage({
               className="stock-search"
               type="search"
               value={search}
-              placeholder="Cari sesi, bin, SKU, atau user"
+              placeholder="Cari transaksi, staff, atau status"
               onChange={(event) =>
                 setSearch(
                   event.target.value,
@@ -837,36 +1150,11 @@ function StockCountPage({
               }
             />
 
-            <select
-              className="stock-status-filter"
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(
-                  event.target.value,
-                )
-              }
-            >
-              <option value="ALL">
-                Semua Status
-              </option>
-
-              {availableStatuses.map(
-                (status) => (
-                  <option
-                    key={status}
-                    value={status}
-                  >
-                    {status}
-                  </option>
-                ),
-              )}
-            </select>
-
             <button
               className="stock-refresh-button"
               type="button"
               disabled={loading}
-              onClick={loadHistory}
+              onClick={loadData}
             >
               {loading
                 ? 'Memuat...'
@@ -887,20 +1175,17 @@ function StockCountPage({
 
         <div className="stock-table-card">
           <div className="stock-table-scroll">
-            <table className="stock-table">
+            <table className="stock-table stock-session-table">
               <thead>
                 <tr>
                   <th>Tanggal</th>
-                  <th>No. Sesi</th>
-                  <th>Lokasi</th>
-                  <th>SKU</th>
-                  <th>Deskripsi</th>
-                  <th>Qty Sistem</th>
-                  <th>Qty Aktual</th>
-                  <th>Selisih</th>
+                  <th>No. Transaksi</th>
+                  <th>Staff</th>
+                  <th>Total Baris</th>
+                  <th>Total Qty Aktual</th>
+                  <th>Total Selisih</th>
                   <th>Status</th>
-                  <th>Penghitung</th>
-                  <th>Catatan</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
 
@@ -909,100 +1194,108 @@ function StockCountPage({
                   <tr>
                     <td
                       className="stock-empty-table"
-                      colSpan="11"
+                      colSpan="8"
                     >
-                      Memuat riwayat Stock Count...
+                      Memuat transaksi Stock Count...
                     </td>
                   </tr>
-                ) : filteredRows.length === 0 ? (
+                ) : filteredSessions
+                    .length === 0 ? (
                   <tr>
                     <td
                       className="stock-empty-table"
-                      colSpan="11"
+                      colSpan="8"
                     >
-                      Belum ada data Stock Count.
+                      Belum ada transaksi Stock Count.
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        {formatDate(
-                          row.createdAt,
-                        )}
-                      </td>
-
-                      <td>
-                        <strong>
-                          {row.countNumber}
-                        </strong>
-                      </td>
-
-                      <td>
-                        <span className="stock-bin-label">
-                          {row.binCode}
-                        </span>
-                      </td>
-
-                      <td>
-                        <strong>
-                          {row.skuCode}
-                        </strong>
-                      </td>
-
-                      <td>
-                        {row.skuName}
-                      </td>
-
-                      <td>
-                        {formatQty(
-                          row.systemQty,
-                        )}
-                      </td>
-
-                      <td>
-                        <strong>
-                          {formatQty(
-                            row.actualQty,
+                  filteredSessions.map(
+                    (session) => (
+                      <tr key={session.id}>
+                        <td>
+                          {formatDate(
+                            session.createdAt,
                           )}
-                        </strong>
-                      </td>
+                        </td>
 
-                      <td>
-                        <strong
-                          className={getVarianceClass(
-                            row.variance,
-                          )}
-                        >
-                          {row.variance > 0
-                            ? '+'
-                            : ''}
+                        <td>
+                          <button
+                            className="transaction-number-button"
+                            type="button"
+                            onClick={() =>
+                              setSelectedSessionId(
+                                session.id,
+                              )
+                            }
+                          >
+                            {
+                              session.transactionNumber
+                            }
+                          </button>
+                        </td>
 
-                          {formatQty(
-                            row.variance,
-                          )}
-                        </strong>
-                      </td>
+                        <td>
+                          <strong>
+                            {session.staffName}
+                          </strong>
+                        </td>
 
-                      <td>
-                        <span
-                          className={`stock-status-label ${getStatusClass(
-                            row.status,
-                          )}`}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
+                        <td>
+                          {session.itemCount}
+                        </td>
 
-                      <td>
-                        {row.counterName}
-                      </td>
+                        <td>
+                          <strong>
+                            {formatQty(
+                              session.totalActualQty,
+                            )}
+                          </strong>
+                        </td>
 
-                      <td>
-                        {row.notes}
-                      </td>
-                    </tr>
-                  ))
+                        <td>
+                          <strong
+                            className={getVarianceClass(
+                              session.totalVariance,
+                            )}
+                          >
+                            {session.totalVariance >
+                            0
+                              ? '+'
+                              : ''}
+
+                            {formatQty(
+                              session.totalVariance,
+                            )}
+                          </strong>
+                        </td>
+
+                        <td>
+                          <span
+                            className={`stock-status-label ${getStatusClass(
+                              session.status,
+                            )}`}
+                          >
+                            {session.status}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="open-detail-button"
+                            type="button"
+                            onClick={() =>
+                              setSelectedSessionId(
+                                session.id,
+                              )
+                            }
+                          >
+                            Buka Detail
+                          </button>
+                        </td>
+                      </tr>
+                    ),
+                  )
                 )}
               </tbody>
             </table>
