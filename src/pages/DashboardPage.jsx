@@ -5,6 +5,7 @@ function DashboardPage({
   onLogout,
   onOpenBinToBin,
   onOpenStockCount,
+  onOpenHandover,
 }) {
   return (
     <main className="dashboard-page">
@@ -69,6 +70,22 @@ function DashboardPage({
             <p>
               Lihat hasil perhitungan fisik
               dan selisih stok.
+            </p>
+          </button>
+
+          <button
+            className="menu-card menu-card-button"
+            type="button"
+            onClick={onOpenHandover}
+          >
+            <div className="menu-icon">
+              HD
+            </div>
+
+            <h3>Handover</h3>
+
+            <p>
+              Pantau serah terima paket kepada kurir.
             </p>
           </button>
         </div>

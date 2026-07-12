@@ -9,6 +9,7 @@ import {
 } from './lib/supabase'
 import BinToBinPage from './pages/BinToBinPage'
 import DashboardPage from './pages/DashboardPage'
+import HandoverPage from './pages/HandoverPage'
 import StockCountPage from './pages/StockCountPage'
 
 function App() {
@@ -215,6 +216,23 @@ function App() {
       )
     }
 
+    if (
+      currentPage === 'handover'
+    ) {
+      return (
+        <HandoverPage
+          session={session}
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'dashboard',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
     return (
       <DashboardPage
         session={session}
@@ -229,6 +247,11 @@ function App() {
         onOpenStockCount={() =>
           setCurrentPage(
             'stock-count',
+          )
+        }
+        onOpenHandover={() =>
+          setCurrentPage(
+            'handover',
           )
         }
       />
