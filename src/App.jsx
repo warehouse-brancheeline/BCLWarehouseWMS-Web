@@ -202,6 +202,7 @@ function App() {
     ) {
       return (
         <StockCountPage
+          session={session}
           loadingLogout={loading}
           onBack={() =>
             setCurrentPage(

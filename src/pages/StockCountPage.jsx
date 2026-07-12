@@ -116,6 +116,7 @@ function safeFilename(value) {
 }
 
 function StockCountPage({
+  session,
   loadingLogout,
   onBack,
   onLogout,
@@ -127,6 +128,63 @@ function StockCountPage({
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Review panel states
+  const [reviewNotes, setReviewNotes] =
+    useState('')
+  const [reviewLoading, setReviewLoading] =
+    useState(false)
+  const [showConfirmDialog, setShowConfirmDialog] =
+    useState(false)
+  const [confirmAction, setConfirmAction] =
+    useState(null)
+  const [currentUserName, setCurrentUserName] =
+    useState('')
+  const [successMessage, setSuccessMessage] =
+    useState('')
+
+  // Get current user name from session/profile
+  useEffect(() => {
+    const getUserName = async () => {
+      if (!session?.user) {
+        return
+      }
+
+      try {
+        const userId = session.user.id
+        const userEmail = session.user.email
+
+        // Try to get user profile
+        const { data: profile } =
+          await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single()
+
+        if (profile) {
+          const name = pickValue(
+            profile,
+            [
+              'full_name',
+              'name',
+              'display_name',
+            ],
+            userEmail,
+          )
+          setCurrentUserName(name)
+        } else {
+          setCurrentUserName(userEmail)
+        }
+      } catch {
+        if (session.user.email) {
+          setCurrentUserName(session.user.email)
+        }
+      }
+    }
+
+    getUserName()
+  }, [session])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -598,6 +656,43 @@ function StockCountPage({
               '',
             ),
 
+            // Review fields
+            reviewNotes: pickValue(
+              session,
+              ['review_notes'],
+              '',
+            ),
+            reviewedByName: pickValue(
+              session,
+              ['reviewed_by_name'],
+              '',
+            ),
+            reviewedAt: pickValue(
+              session,
+              ['reviewed_at'],
+              '',
+            ),
+            approvedByName: pickValue(
+              session,
+              ['approved_by_name'],
+              '',
+            ),
+            approvedAt: pickValue(
+              session,
+              ['approved_at'],
+              '',
+            ),
+            rejectedByName: pickValue(
+              session,
+              ['rejected_by_name'],
+              '',
+            ),
+            rejectedAt: pickValue(
+              session,
+              ['rejected_at'],
+              '',
+            ),
+
             itemCount: items.length,
             totalSystemQty,
             totalActualQty,
@@ -694,6 +789,150 @@ function StockCountPage({
     [sessions],
   )
 
+  // Check if review buttons should be enabled
+  const isReviewDisabled = useMemo(() => {
+    if (!selectedSession) {
+      return true
+    }
+
+    const status = normalizeStatus(
+      selectedSession.status,
+    )
+
+    return (
+      status === 'APPROVED' ||
+      status === 'REJECTED'
+    )
+  }, [selectedSession])
+
+  const canMarkReviewed = useMemo(() => {
+    if (!selectedSession || isReviewDisabled) {
+      return false
+    }
+
+    const status = normalizeStatus(
+      selectedSession.status,
+    )
+
+    return status === 'SUBMITTED'
+  }, [selectedSession, isReviewDisabled])
+
+  const canApprove = useMemo(() => {
+    if (!selectedSession || isReviewDisabled) {
+      return false
+    }
+
+    const status = normalizeStatus(
+      selectedSession.status,
+    )
+
+    return (
+      status === 'SUBMITTED' ||
+      status === 'REVIEWED'
+    )
+  }, [selectedSession, isReviewDisabled])
+
+  const canReject = useMemo(() => {
+    if (!selectedSession || isReviewDisabled) {
+      return false
+    }
+
+    const status = normalizeStatus(
+      selectedSession.status,
+    )
+
+    return (
+      status === 'SUBMITTED' ||
+      status === 'REVIEWED'
+    )
+  }, [selectedSession, isReviewDisabled])
+
+  // Handle review action
+  const handleReviewAction = useCallback(
+    async (action) => {
+      if (!selectedSession || !currentUserName) {
+        setError('User tidak tersedia.')
+        return
+      }
+
+      // Validate reject requires notes
+      if (
+        action === 'REJECTED' &&
+        !reviewNotes.trim()
+      ) {
+        setError('Catatan wajib diisi untuk Reject.')
+        return
+      }
+
+      setConfirmAction({
+        action,
+        notes: reviewNotes,
+      })
+      setShowConfirmDialog(true)
+    },
+    [selectedSession, currentUserName, reviewNotes],
+  )
+
+  // Execute review action
+  const executeReviewAction = useCallback(
+    async () => {
+      if (
+        !confirmAction ||
+        !selectedSession ||
+        !currentUserName
+      ) {
+        return
+      }
+
+      setShowConfirmDialog(false)
+      setReviewLoading(true)
+      setError('')
+
+      try {
+        const { error: rpcError } =
+          await supabase.rpc(
+            'review_stock_count_session',
+            {
+              p_session_id: selectedSession.id,
+              p_action: confirmAction.action,
+              p_reviewer_name: currentUserName,
+              p_review_notes:
+                confirmAction.notes || null,
+            },
+          )
+
+        if (rpcError) {
+          throw rpcError
+        }
+
+        // Success
+        setSuccessMessage(
+          `Transaksi berhasil di-${confirmAction.action.toLowerCase()}.`,
+        )
+        setReviewNotes('')
+        setConfirmAction(null)
+
+        // Reload data
+        await loadData()
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage('')
+        }, 3000)
+      } catch (reviewError) {
+        console.error(reviewError)
+
+        setError(
+          reviewError?.message ||
+            'Gagal memproses review transaksi.',
+        )
+      } finally {
+        setReviewLoading(false)
+      }
+    },
+    [confirmAction, selectedSession, currentUserName, loadData],
+  )
+
   const downloadExcel = () => {
     if (!selectedSession) {
       return
@@ -742,6 +981,47 @@ function StockCountPage({
         selectedSession.notes,
       ],
     ]
+
+    // Add review information if available
+    if (selectedSession.reviewedByName) {
+      summaryRows.push([
+        'Direview Oleh',
+        selectedSession.reviewedByName,
+      ])
+      summaryRows.push([
+        'Tanggal Review',
+        formatDate(selectedSession.reviewedAt),
+      ])
+    }
+
+    if (selectedSession.approvedByName) {
+      summaryRows.push([
+        'Disetujui Oleh',
+        selectedSession.approvedByName,
+      ])
+      summaryRows.push([
+        'Tanggal Persetujuan',
+        formatDate(selectedSession.approvedAt),
+      ])
+    }
+
+    if (selectedSession.rejectedByName) {
+      summaryRows.push([
+        'Ditolak Oleh',
+        selectedSession.rejectedByName,
+      ])
+      summaryRows.push([
+        'Tanggal Penolakan',
+        formatDate(selectedSession.rejectedAt),
+      ])
+    }
+
+    if (selectedSession.reviewNotes) {
+      summaryRows.push([
+        'Catatan Review',
+        selectedSession.reviewNotes,
+      ])
+    }
 
     const detailRows =
       selectedSession.items.map(
@@ -954,6 +1234,203 @@ function StockCountPage({
             </article>
           </div>
 
+          {/* Review Information Panel */}
+          <div className="stock-review-info-card">
+            <div className="stock-review-info-header">
+              <h3>Informasi Review</h3>
+            </div>
+
+            <div className="stock-review-info-grid">
+              {selectedSession.reviewedByName && (
+                <>
+                  <div>
+                    <span>
+                      Direview Oleh
+                    </span>
+                    <strong>
+                      {
+                        selectedSession.reviewedByName
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Tanggal Review
+                    </span>
+                    <strong>
+                      {formatDate(
+                        selectedSession.reviewedAt,
+                      )}
+                    </strong>
+                  </div>
+                </>
+              )}
+
+              {selectedSession.approvedByName && (
+                <>
+                  <div>
+                    <span>
+                      Disetujui Oleh
+                    </span>
+                    <strong>
+                      {
+                        selectedSession.approvedByName
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Tanggal Persetujuan
+                    </span>
+                    <strong>
+                      {formatDate(
+                        selectedSession.approvedAt,
+                      )}
+                    </strong>
+                  </div>
+                </>
+              )}
+
+              {selectedSession.rejectedByName && (
+                <>
+                  <div>
+                    <span>
+                      Ditolak Oleh
+                    </span>
+                    <strong>
+                      {
+                        selectedSession.rejectedByName
+                      }
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Tanggal Penolakan
+                    </span>
+                    <strong>
+                      {formatDate(
+                        selectedSession.rejectedAt,
+                      )}
+                    </strong>
+                  </div>
+                </>
+              )}
+
+              {selectedSession.reviewNotes && (
+                <div className="stock-review-notes-full">
+                  <span>Catatan Review</span>
+                  <div className="stock-review-notes-text">
+                    {
+                      selectedSession.reviewNotes
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Review Panel */}
+          {!isReviewDisabled && (
+            <div className="stock-review-panel">
+              <div className="stock-review-header">
+                <h3>Review Stock Count</h3>
+              </div>
+
+              <div className="stock-review-form">
+                <div className="stock-review-notes-field">
+                  <label htmlFor="review-notes">
+                    Catatan Review
+                  </label>
+
+                  <textarea
+                    id="review-notes"
+                    className="stock-review-textarea"
+                    value={reviewNotes}
+                    placeholder="Masukkan catatan review (opsional, kecuali untuk Reject)"
+                    disabled={reviewLoading}
+                    onChange={(event) =>
+                      setReviewNotes(
+                        event.target.value,
+                      )
+                    }
+                    rows="4"
+                  />
+                </div>
+
+                <div className="stock-review-buttons">
+                  {canMarkReviewed && (
+                    <button
+                      className="stock-review-button stock-reviewed-button"
+                      type="button"
+                      disabled={reviewLoading}
+                      onClick={() =>
+                        handleReviewAction(
+                          'REVIEWED',
+                        )
+                      }
+                    >
+                      {reviewLoading
+                        ? 'Proses...'
+                        : 'Tandai Reviewed'}
+                    </button>
+                  )}
+
+                  {canApprove && (
+                    <button
+                      className="stock-review-button stock-approve-button"
+                      type="button"
+                      disabled={reviewLoading}
+                      onClick={() =>
+                        handleReviewAction(
+                          'APPROVED',
+                        )
+                      }
+                    >
+                      {reviewLoading
+                        ? 'Proses...'
+                        : 'Approve'}
+                    </button>
+                  )}
+
+                  {canReject && (
+                    <button
+                      className="stock-review-button stock-reject-button"
+                      type="button"
+                      disabled={
+                        reviewLoading ||
+                        !reviewNotes.trim()
+                      }
+                      onClick={() =>
+                        handleReviewAction(
+                          'REJECTED',
+                        )
+                      }
+                    >
+                      {reviewLoading
+                        ? 'Proses...'
+                        : 'Reject'}
+                    </button>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="error-message">
+                    {error}
+                  </div>
+                )}
+
+                {successMessage && (
+                  <div className="success-message">
+                    {successMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="stock-table-card">
             <div className="stock-table-scroll">
               <table className="stock-table stock-detail-table">
@@ -1054,6 +1531,62 @@ function StockCountPage({
               </table>
             </div>
           </div>
+
+          {/* Confirmation Dialog */}
+          {showConfirmDialog && (
+            <div className="stock-confirm-dialog-overlay">
+              <div className="stock-confirm-dialog">
+                <h2>Konfirmasi Action</h2>
+
+                <p>
+                  Apakah Anda yakin ingin{' '}
+                  {confirmAction?.action ===
+                  'REVIEWED'
+                    ? 'menandai sebagai Reviewed'
+                    : confirmAction?.action ===
+                        'APPROVED'
+                      ? 'Approve'
+                      : 'Reject'}{' '}
+                  transaksi ini?
+                </p>
+
+                <div className="stock-confirm-buttons">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmDialog(
+                        false,
+                      )
+                    }
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    className={`primary-button ${
+                      confirmAction?.action ===
+                      'REJECTED'
+                        ? 'stock-reject-button'
+                        : confirmAction?.action ===
+                            'APPROVED'
+                          ? 'stock-approve-button'
+                          : 'stock-reviewed-button'
+                    }`}
+                    type="button"
+                    disabled={reviewLoading}
+                    onClick={
+                      executeReviewAction
+                    }
+                  >
+                    {reviewLoading
+                      ? 'Proses...'
+                      : 'Ya, Lanjutkan'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     )
