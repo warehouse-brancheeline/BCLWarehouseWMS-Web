@@ -186,6 +186,7 @@ function App() {
     ) {
       return (
         <BinToBinPage
+          session={session}
           loadingLogout={loading}
           onBack={() =>
             setCurrentPage(
