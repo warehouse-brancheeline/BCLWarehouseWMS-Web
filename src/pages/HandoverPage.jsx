@@ -665,9 +665,19 @@ function HandoverPage({
     <>
       <header className="handover-page-header">
         <div className="handover-header-left">
+          <div>
+            <p className="small-label">BCL Warehouse WMS</p>
+            <h1>Handover</h1>
+            <p className="handover-page-subtitle">
+              Monitoring serah terima paket kepada kurir.
+            </p>
+          </div>
+        </div>
+
+        <div className="handover-header-actions">
           {onBack ? (
             <button
-              className="handover-back-button"
+              className="handover-action-button handover-action-button--secondary"
               type="button"
               onClick={onBack}
               title="Kembali ke Dashboard"
@@ -681,6 +691,7 @@ function HandoverPage({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                aria-hidden="true"
               >
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
@@ -688,16 +699,6 @@ function HandoverPage({
             </button>
           ) : null}
 
-          <div>
-            <p className="small-label">BCL Warehouse WMS</p>
-            <h1>Handover</h1>
-            <p className="handover-page-subtitle">
-              Monitoring serah terima paket kepada kurir.
-            </p>
-          </div>
-        </div>
-
-        <div className="handover-header-actions">
           <button
             className="handover-action-button handover-action-button--secondary"
             type="button"
