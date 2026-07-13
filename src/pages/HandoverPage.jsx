@@ -156,6 +156,31 @@ function getVerificationClass(value) {
   return 'handover-pill-default'
 }
 
+function getGroupOperationalDate(group) {
+  return group.submitted_at || group.created_at
+}
+
+function getWitaDateKey(isoValue) {
+  if (!isoValue) {
+    return null
+  }
+
+  const timestamp = new Date(isoValue).getTime()
+
+  if (Number.isNaN(timestamp)) {
+    return null
+  }
+
+  const WITA_OFFSET_MS = 8 * 60 * 60 * 1000
+  const witaDate = new Date(timestamp + WITA_OFFSET_MS)
+
+  return [
+    witaDate.getUTCFullYear(),
+    String(witaDate.getUTCMonth() + 1).padStart(2, '0'),
+    String(witaDate.getUTCDate()).padStart(2, '0'),
+  ].join('-')
+}
+
 function HandoverPage({
   session,
   loadingLogout,
@@ -172,6 +197,7 @@ function HandoverPage({
     courier: '',
     status: 'ALL',
   })
+  const [dateValidationError, setDateValidationError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -342,6 +368,18 @@ function HandoverPage({
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    if (
+      filters.startDate &&
+      filters.endDate &&
+      filters.startDate > filters.endDate
+    ) {
+      setDateValidationError('Tanggal mulai tidak boleh melewati tanggal akhir.')
+    } else {
+      setDateValidationError('')
+    }
+  }, [filters.startDate, filters.endDate])
+
   const availableCouriers = useMemo(() => {
     const courierNames = new Set(
       groups
@@ -357,7 +395,7 @@ function HandoverPage({
   const filteredGroups = useMemo(() => {
     const searchText = search.trim().toLowerCase()
 
-    return groups.filter((group) => {
+    return groups.filter((group, index) => {
       const courierName = String(group.courierName || '')
         .toLowerCase()
       const groupNumber = String(group.group_number || '')
@@ -389,17 +427,27 @@ function HandoverPage({
         staffName.includes(searchText) ||
         trackingMatches
 
-      const groupDate = group.submitted_at || group.created_at
-      const startDate = filters.startDate
-      const endDate = filters.endDate
-      const afterStart =
-        !startDate ||
-        !groupDate ||
-        groupDate >= startDate
-      const beforeEnd =
-        !endDate ||
-        !groupDate ||
-        groupDate <= endDate
+      const operationalDate = getGroupOperationalDate(group)
+      const operationalDateKey = getWitaDateKey(operationalDate)
+
+      const matchesStartDate =
+        !filters.startDate || operationalDateKey >= filters.startDate
+      const matchesEndDate =
+        !filters.endDate || operationalDateKey <= filters.endDate
+
+      const matchesDate = matchesStartDate && matchesEndDate
+
+      // Debug untuk 2 data pertama
+      if (index < 2 && (filters.startDate || filters.endDate)) {
+        console.debug('Handover date filter', {
+          groupNumber: group.group_number,
+          sourceDate: operationalDate,
+          operationalDateKey,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          matchesDate,
+        })
+      }
 
       const matchesCourier =
         !filters.courier ||
@@ -411,8 +459,7 @@ function HandoverPage({
 
       return (
         matchesSearch &&
-        afterStart &&
-        beforeEnd &&
+        matchesDate &&
         matchesCourier &&
         matchesStatus
       )
@@ -617,12 +664,37 @@ function HandoverPage({
   const renderListView = () => (
     <>
       <header className="handover-page-header">
-        <div>
-          <p className="small-label">BCL Warehouse WMS</p>
-          <h1>Handover</h1>
-          <p className="handover-page-subtitle">
-            Monitoring serah terima paket kepada kurir.
-          </p>
+        <div className="handover-header-left">
+          {onBack ? (
+            <button
+              className="handover-back-button"
+              type="button"
+              onClick={onBack}
+              title="Kembali ke Dashboard"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span>Kembali</span>
+            </button>
+          ) : null}
+
+          <div>
+            <p className="small-label">BCL Warehouse WMS</p>
+            <h1>Handover</h1>
+            <p className="handover-page-subtitle">
+              Monitoring serah terima paket kepada kurir.
+            </p>
+          </div>
         </div>
 
         <div className="handover-header-actions">
@@ -639,7 +711,7 @@ function HandoverPage({
             className="handover-action-button handover-action-button--primary"
             type="button"
             onClick={handleDownloadListExcel}
-            disabled={loading || filteredGroups.length === 0}
+            disabled={loading || filteredGroups.length === 0 || Boolean(dateValidationError)}
           >
             Download Excel
           </button>
@@ -758,6 +830,12 @@ function HandoverPage({
             </label>
           </div>
 
+          {dateValidationError ? (
+            <div className="handover-error-message" style={{ marginBottom: '1rem', color: '#e74c3c' }}>
+              <p>{dateValidationError}</p>
+            </div>
+          ) : null}
+
           <div className="handover-search-row">
             <label className="handover-input-group handover-search-group">
               <span>Cari nomor group, resi, ekspedisi, staff, atau kurir</span>
@@ -780,6 +858,7 @@ function HandoverPage({
                   courier: '',
                   status: 'ALL',
                 })
+                setDateValidationError('')
               }}
             >
               Reset Filter
@@ -922,20 +1001,35 @@ function HandoverPage({
     return (
       <>
         <header className="handover-page-header">
-          <div>
-            <p className="small-label">BCL Warehouse WMS</p>
-            <h1>Detail Group Handover</h1>
+          <div className="handover-header-left">
+            <button
+              className="handover-back-button"
+              type="button"
+              onClick={() => setSelectedGroupId(null)}
+              title="Kembali ke List Handover"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span>Kembali ke Handover</span>
+            </button>
+
+            <div>
+              <p className="small-label">BCL Warehouse WMS</p>
+              <h1>Detail Group Handover</h1>
+            </div>
           </div>
 
           <div className="handover-header-actions">
-            <button
-              className="handover-action-button handover-action-button--secondary"
-              type="button"
-              onClick={() => setSelectedGroupId(null)}
-            >
-              Kembali
-            </button>
-
             <button
               className="handover-action-button handover-action-button--secondary"
               type="button"

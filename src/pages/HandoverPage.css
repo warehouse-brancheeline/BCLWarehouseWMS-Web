@@ -13,6 +13,59 @@
   background: #ffffff;
 }
 
+.handover-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.handover-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #17316b;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.handover-back-button:hover {
+  background: rgba(49, 94, 232, 0.08);
+  border-color: rgba(49, 94, 232, 0.2);
+}
+
+.handover-back-button:active {
+  background: rgba(49, 94, 232, 0.12);
+}
+
+.handover-back-button:focus-visible {
+  outline: 2px solid #315ee8;
+  outline-offset: 2px;
+}
+
+.handover-back-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.handover-back-button svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .handover-page-header h1 {
   margin: 6px 0 4px;
   font-size: 24px;
@@ -421,6 +474,11 @@
     flex-direction: column;
   }
 
+  .handover-header-left {
+    flex-direction: column;
+    width: 100%;
+  }
+
   .handover-search-row,
   .handover-section-header {
     flex-direction: column;
@@ -440,6 +498,10 @@
 @media (max-width: 640px) {
   .handover-page-header {
     padding: 18px 20px;
+  }
+
+  .handover-header-left {
+    width: 100%;
   }
 
   .handover-header-actions {
