@@ -2,11 +2,15 @@ function DashboardPage({
   session,
   loading,
   error,
+  profile,
+  profileLoading,
+  isAdmin,
   onLogout,
   onOpenBinToBin,
   onOpenStockCount,
   onOpenHandover,
   onOpenScanPack,
+  onOpenUserManagement,
 }) {
   return (
     <main className="dashboard-page">
@@ -36,7 +40,17 @@ function DashboardPage({
       <section className="dashboard-content">
         <article className="welcome-card">
           <p>Login berhasil</p>
-          <h2>{session.user.email}</h2>
+
+          <h2>
+            {profileLoading
+              ? 'Memuat profil...'
+              : profile?.full_name ||
+                session.user.email}
+          </h2>
+
+          {profile?.full_name ? (
+            <p>{session.user.email}</p>
+          ) : null}
         </article>
 
         <div className="menu-grid">
@@ -105,6 +119,24 @@ function DashboardPage({
               Pantau paket yang telah selesai dipacking.
             </p>
           </button>
+
+          {isAdmin ? (
+            <button
+              className="menu-card menu-card-button"
+              type="button"
+              onClick={onOpenUserManagement}
+            >
+              <div className="menu-icon">
+                UM
+              </div>
+
+              <h3>Manajemen User</h3>
+
+              <p>
+                Daftarkan dan lihat akun pengguna WMS.
+              </p>
+            </button>
+          ) : null}
         </div>
 
         {error && (

@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage'
 import HandoverPage from './pages/HandoverPage'
 import ScanPackPage from './pages/ScanPackPage'
 import StockCountPage from './pages/StockCountPage'
+import UserManagementPage from './pages/UserManagementPage'
 
 function App() {
   const [session, setSession] =
@@ -41,6 +42,14 @@ function App() {
     currentPage,
     setCurrentPage,
   ] = useState('dashboard')
+
+  const [profile, setProfile] =
+    useState(null)
+
+  const [
+    profileLoading,
+    setProfileLoading,
+  ] = useState(false)
 
   useEffect(() => {
     if (!supabase) {
@@ -89,6 +98,69 @@ function App() {
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+
+    const loadProfile = async () => {
+      if (
+        !session?.user?.id ||
+        !supabase
+      ) {
+        if (active) {
+          setProfile(null)
+          setProfileLoading(false)
+        }
+
+        return
+      }
+
+      setProfileLoading(true)
+
+      const {
+        data,
+        error: profileError,
+      } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          email,
+          full_name,
+          role,
+          is_active,
+          warehouse_id
+        `)
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (!active) {
+        return
+      }
+
+      if (profileError) {
+        console.error(
+          'Gagal memuat profile:',
+          profileError,
+        )
+
+        setProfile(null)
+      } else {
+        setProfile(data)
+      }
+
+      setProfileLoading(false)
+    }
+
+    loadProfile()
+
+    return () => {
+      active = false
+    }
+  }, [session])
+
+  const isAdmin =
+    profile?.role === 'admin' &&
+    profile?.is_active === true
 
   const handleLogin = async (event) => {
     event.preventDefault()
@@ -250,11 +322,32 @@ function App() {
       )
     }
 
+    if (
+      currentPage === 'user-management' &&
+      isAdmin
+    ) {
+      return (
+        <UserManagementPage
+          profile={profile}
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'dashboard',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
     return (
       <DashboardPage
         session={session}
         loading={loading}
         error={error}
+        profile={profile}
+        profileLoading={profileLoading}
+        isAdmin={isAdmin}
         onLogout={handleLogout}
         onOpenBinToBin={() =>
           setCurrentPage(
@@ -274,6 +367,11 @@ function App() {
         onOpenScanPack={() =>
           setCurrentPage(
             'scan-pack',
+          )
+        }
+        onOpenUserManagement={() =>
+          setCurrentPage(
+            'user-management',
           )
         }
       />
