@@ -6,6 +6,7 @@ function DashboardPage({
   onOpenBinToBin,
   onOpenStockCount,
   onOpenHandover,
+  onOpenScanPack,
 }) {
   return (
     <main className="dashboard-page">
@@ -86,6 +87,22 @@ function DashboardPage({
 
             <p>
               Pantau serah terima paket kepada kurir.
+            </p>
+          </button>
+
+          <button
+            className="menu-card menu-card-button"
+            type="button"
+            onClick={onOpenScanPack}
+          >
+            <div className="menu-icon">
+              SP
+            </div>
+
+            <h3>Scan Pack</h3>
+
+            <p>
+              Pantau paket yang telah selesai dipacking.
             </p>
           </button>
         </div>

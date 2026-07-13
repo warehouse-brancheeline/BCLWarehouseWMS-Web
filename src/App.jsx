@@ -10,6 +10,7 @@ import {
 import BinToBinPage from './pages/BinToBinPage'
 import DashboardPage from './pages/DashboardPage'
 import HandoverPage from './pages/HandoverPage'
+import ScanPackPage from './pages/ScanPackPage'
 import StockCountPage from './pages/StockCountPage'
 
 function App() {
@@ -217,6 +218,22 @@ function App() {
     }
 
     if (
+      currentPage === 'scan-pack'
+    ) {
+      return (
+        <ScanPackPage
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'dashboard',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (
       currentPage === 'handover'
     ) {
       return (
@@ -252,6 +269,11 @@ function App() {
         onOpenHandover={() =>
           setCurrentPage(
             'handover',
+          )
+        }
+        onOpenScanPack={() =>
+          setCurrentPage(
+            'scan-pack',
           )
         }
       />

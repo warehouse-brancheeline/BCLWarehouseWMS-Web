@@ -1,0 +1,158 @@
+.scan-pack-page {
+  min-height: 100vh;
+  background: #f4f7fc;
+}
+
+.scan-pack-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+  border-bottom: 1px solid #e1e6f0;
+  background: #ffffff;
+}
+
+.scan-pack-header h1 {
+  margin: 6px 0 4px;
+  color: #17316b;
+}
+
+.scan-pack-subtitle {
+  margin: 0;
+  color: #6f788c;
+}
+
+.scan-pack-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scan-pack-actions button {
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 18px;
+}
+
+.scan-pack-content {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 28px 0 60px;
+}
+
+.scan-pack-summary {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(190px, 1fr)
+  );
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.scan-pack-card,
+.scan-pack-panel,
+.scan-pack-message {
+  border: 1px solid #e1e6f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px
+    rgba(20, 42, 90, 0.05);
+}
+
+.scan-pack-card {
+  padding: 18px 20px;
+}
+
+.scan-pack-card p {
+  margin: 0 0 8px;
+  color: #6f788c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scan-pack-card strong {
+  color: #17316b;
+  font-size: 20px;
+}
+
+.scan-pack-panel {
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.scan-pack-search-row,
+.scan-pack-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.scan-pack-search-row input,
+.scan-pack-panel-header input {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cad2e1;
+  border-radius: 10px;
+}
+
+.scan-pack-table-wrapper {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.scan-pack-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.scan-pack-table th,
+.scan-pack-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eceff4;
+  text-align: left;
+}
+
+.scan-pack-table th {
+  color: #6f788c;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.scan-pack-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #315ee8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scan-pack-message {
+  padding: 28px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .scan-pack-header {
+    flex-direction: column;
+  }
+
+  .scan-pack-actions {
+    width: 100%;
+  }
+
+  .scan-pack-actions button {
+    flex: 1 1 auto;
+  }
+
+  .scan-pack-search-row,
+  .scan-pack-panel-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
