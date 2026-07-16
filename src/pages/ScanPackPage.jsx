@@ -50,8 +50,12 @@ function getSourceLabel(source) {
 }
 
 function ScanPackPage({
+  session,
+  isAdmin,
   loadingLogout,
   onBack,
+  onOpenHistory,
+  onOpenCancelledShipments,
   onLogout,
 }) {
   const [sessions, setSessions] = useState([])
@@ -62,6 +66,16 @@ function ScanPackPage({
   const [detailSearch, setDetailSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancelTarget, setCancelTarget] =
+    useState(null)
+
+  const [
+    cancellingItemId,
+    setCancellingItemId,
+  ] = useState(null)
+
+  const [cancelToast, setCancelToast] =
+    useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -136,6 +150,19 @@ function ScanPackPage({
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (!cancelToast) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      setCancelToast('')
+    }, 3000)
+
+    return () =>
+      window.clearTimeout(timer)
+  }, [cancelToast])
 
   const filteredSessions = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -270,6 +297,133 @@ function ScanPackPage({
     )
   }
 
+  const getCurrentUserName = async () => {
+    const fallback =
+      session?.user?.user_metadata?.full_name ||
+      session?.user?.user_metadata?.name ||
+      session?.user?.email ||
+      'User Warehouse'
+
+    if (!session?.user?.id) {
+      return fallback
+    }
+
+    const {
+      data,
+      error: profileError,
+    } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error(
+        'Gagal membaca profile user:',
+        profileError,
+      )
+
+      return fallback
+    }
+
+    return (
+      data?.full_name ||
+      data?.email ||
+      fallback
+    )
+  }
+
+  const handleMarkCancelled = async () => {
+    const item = cancelTarget
+
+    if (!item?.id) {
+      return
+    }
+
+    setCancellingItemId(
+      String(item.id),
+    )
+
+    try {
+      const userName =
+        await getCurrentUserName()
+
+      const {
+        data,
+        error: cancelError,
+      } = await supabase.rpc(
+        'mark_scan_pack_item_cancelled',
+        {
+          p_item_id: item.id,
+          p_cancelled_by_name: userName,
+        },
+      )
+
+      if (cancelError) {
+        throw cancelError
+      }
+
+      const cancelledAt =
+        data?.cancelled_at ||
+        data?.cancelledAt ||
+        new Date().toISOString()
+
+      const cancelledByName =
+        data?.cancelled_by_name ||
+        data?.cancelledByName ||
+        userName
+
+      setSessions((currentSessions) =>
+        currentSessions.map(
+          (currentSession) => {
+            if (
+              String(currentSession.id) !==
+              String(selectedSession.id)
+            ) {
+              return currentSession
+            }
+
+            return {
+              ...currentSession,
+              items: (
+                currentSession.items || []
+              ).map((currentItem) =>
+                String(currentItem.id) ===
+                String(item.id)
+                  ? {
+                      ...currentItem,
+                      is_cancelled: true,
+                      cancelled_at:
+                        cancelledAt,
+                      cancelled_by_name:
+                        cancelledByName,
+                    }
+                  : currentItem,
+              ),
+            }
+          },
+        ),
+      )
+
+      setCancelTarget(null)
+
+      setCancelToast(
+        'Order berhasil ditandai cancel.',
+      )
+    } catch (cancelError) {
+      console.error(
+        'Gagal menandai order cancel:',
+        cancelError,
+      )
+
+      setCancelToast(
+        'Gagal menandai order cancel. Silakan coba kembali.',
+      )
+    } finally {
+      setCancellingItemId(null)
+    }
+  }
+
   if (selectedSession) {
     return (
       <main className="scan-pack-page">
@@ -383,13 +537,24 @@ function ScanPackPage({
                     <th>Nomor Resi</th>
                     <th>Sumber Scan</th>
                     <th>Waktu Scan</th>
+                    <th>Status Order</th>
+                    <th>Ditandai Oleh</th>
+                    <th>Waktu Cancel</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filteredItems.map(
                     (item, index) => (
-                      <tr key={item.id}>
+                      <tr
+                        className={
+                          item.is_cancelled
+                            ? 'scan-pack-cancelled-row'
+                            : ''
+                        }
+                        key={item.id}
+                      >
                         <td>
                           {item.scan_sequence ||
                             index + 1}
@@ -407,6 +572,54 @@ function ScanPackPage({
                             item.scanned_at,
                           )}
                         </td>
+
+                        <td>
+                          <span
+                            className={
+                              item.is_cancelled
+                                ? 'scan-pack-order-badge scan-pack-order-cancelled'
+                                : 'scan-pack-order-badge scan-pack-order-active'
+                            }
+                          >
+                            {item.is_cancelled
+                              ? 'ORDER CANCEL'
+                              : 'ORDER AKTIF'}
+                          </span>
+                        </td>
+
+                        <td>
+                          {item.cancelled_by_name ||
+                            '-'}
+                        </td>
+
+                        <td>
+                          {formatDate(
+                            item.cancelled_at,
+                          )}
+                        </td>
+
+                        <td>
+                          {!item.is_cancelled ? (
+                            <button
+                              className="scan-pack-cancel-button"
+                              type="button"
+                              disabled={
+                                cancellingItemId ===
+                                String(item.id)
+                              }
+                              onClick={() =>
+                                setCancelTarget(item)
+                              }
+                            >
+                              {cancellingItemId ===
+                              String(item.id)
+                                ? 'Memproses...'
+                                : 'Tandai Cancel'}
+                            </button>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                       </tr>
                     ),
                   )}
@@ -415,6 +628,79 @@ function ScanPackPage({
             </div>
           </section>
         </section>
+
+        {cancelTarget ? (
+          <div
+            className="scan-pack-cancel-backdrop"
+            role="presentation"
+            onClick={() => {
+              if (!cancellingItemId) {
+                setCancelTarget(null)
+              }
+            }}
+          >
+            <section
+              className="scan-pack-cancel-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="scan-pack-cancel-title"
+              onClick={(event) =>
+                event.stopPropagation()
+              }
+            >
+              <h2 id="scan-pack-cancel-title">
+                Tandai Order Cancel
+              </h2>
+
+              <p>
+                Anda yakin ingin menandai order
+                ini sebagai cancel?
+              </p>
+
+              <div className="scan-pack-cancel-reference">
+                Nomor Resi:{' '}
+                <strong>
+                  {cancelTarget.tracking_number ||
+                    '-'}
+                </strong>
+              </div>
+
+              <div className="scan-pack-cancel-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={Boolean(
+                    cancellingItemId,
+                  )}
+                  onClick={() =>
+                    setCancelTarget(null)
+                  }
+                >
+                  Tidak
+                </button>
+
+                <button
+                  className="scan-pack-danger-button"
+                  type="button"
+                  disabled={Boolean(
+                    cancellingItemId,
+                  )}
+                  onClick={handleMarkCancelled}
+                >
+                  {cancellingItemId
+                    ? 'Memproses...'
+                    : 'Ya'}
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {cancelToast ? (
+          <div className="scan-pack-toast">
+            {cancelToast}
+          </div>
+        ) : null}
       </main>
     )
   }
@@ -449,6 +735,24 @@ function ScanPackPage({
             disabled={loading}
           >
             {loading ? 'Memuat...' : 'Refresh'}
+          </button>
+
+          {isAdmin ? (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={onOpenCancelledShipments}
+            >
+              Input Resi Cancel
+            </button>
+          ) : null}
+
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onOpenHistory}
+          >
+            History Packing
           </button>
 
           <button

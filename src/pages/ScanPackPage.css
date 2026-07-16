@@ -156,3 +156,333 @@
     align-items: stretch;
   }
 }
+
+/* ==================================================
+   DELETE DRAFT SCAN PACK
+================================================== */
+
+.scan-pack-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scan-pack-danger-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #dc2626;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scan-pack-danger-button:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.scan-pack-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scan-pack-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2100;
+  max-width: min(420px, calc(100% - 40px));
+  padding: 13px 18px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #172b55;
+  box-shadow: 0 15px 36px
+    rgba(15, 23, 42, 0.24);
+}
+
+.scan-pack-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.scan-pack-confirm-dialog {
+  width: min(440px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px
+    rgba(15, 23, 42, 0.28);
+}
+
+.scan-pack-confirm-dialog h2 {
+  margin: 0 0 10px;
+  color: #172b55;
+}
+
+.scan-pack-confirm-dialog > p {
+  color: #5c6578;
+}
+
+.scan-pack-confirm-reference {
+  padding: 12px 14px;
+  margin: 18px 0;
+  border-radius: 10px;
+  background: #f4f7fc;
+}
+
+.scan-pack-confirm-reference p {
+  margin: 5px 0;
+}
+
+.scan-pack-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.scan-pack-confirm-actions button {
+  width: auto;
+  min-width: 100px;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .scan-pack-confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .scan-pack-confirm-actions button {
+    width: 100%;
+  }
+}
+
+/* ==================================================
+   DELETE DRAFT SCAN PACK
+================================================== */
+
+.scan-pack-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scan-pack-danger-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #dc2626;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scan-pack-danger-button:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.scan-pack-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scan-pack-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2100;
+  max-width: min(420px, calc(100% - 40px));
+  padding: 13px 18px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #172b55;
+  box-shadow: 0 15px 36px
+    rgba(15, 23, 42, 0.24);
+}
+
+.scan-pack-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.scan-pack-confirm-dialog {
+  width: min(440px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px
+    rgba(15, 23, 42, 0.28);
+}
+
+.scan-pack-confirm-dialog h2 {
+  margin: 0 0 10px;
+  color: #172b55;
+}
+
+.scan-pack-confirm-dialog > p {
+  color: #5c6578;
+}
+
+.scan-pack-confirm-reference {
+  padding: 12px 14px;
+  margin: 18px 0;
+  border-radius: 10px;
+  background: #f4f7fc;
+}
+
+.scan-pack-confirm-reference p {
+  margin: 5px 0;
+}
+
+.scan-pack-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.scan-pack-confirm-actions button {
+  width: auto;
+  min-width: 100px;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .scan-pack-confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .scan-pack-confirm-actions button {
+    width: 100%;
+  }
+}
+
+/* ==================================================
+   STATUS DAN CANCEL ORDER SCAN PACK
+================================================== */
+
+.scan-pack-cancelled-row {
+  background: #fff1f2;
+}
+
+.scan-pack-order-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.scan-pack-order-active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.scan-pack-order-cancelled {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.scan-pack-cancel-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  color: #b91c1c;
+  background: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scan-pack-cancel-button:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.scan-pack-cancel-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scan-pack-cancel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.scan-pack-cancel-dialog {
+  width: min(440px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 25px 70px
+    rgba(15, 23, 42, 0.3);
+}
+
+.scan-pack-cancel-dialog h2 {
+  margin: 0 0 10px;
+  color: #172b55;
+}
+
+.scan-pack-cancel-reference {
+  padding: 13px 14px;
+  margin: 18px 0;
+  border-radius: 10px;
+  background: #f4f7fc;
+}
+
+.scan-pack-cancel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.scan-pack-cancel-actions button {
+  width: auto;
+  min-width: 100px;
+  margin: 0;
+}
+
+.scan-pack-danger-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #dc2626;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scan-pack-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 3500;
+  max-width: calc(100% - 40px);
+  padding: 13px 18px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #172b55;
+  box-shadow: 0 16px 40px
+    rgba(15, 23, 42, 0.25);
+}

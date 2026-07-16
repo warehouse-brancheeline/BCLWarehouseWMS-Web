@@ -8,9 +8,11 @@ import {
   supabaseConfigError,
 } from './lib/supabase'
 import BinToBinPage from './pages/BinToBinPage'
+import CancelledShipmentsPage from './pages/CancelledShipmentsPage'
 import DashboardPage from './pages/DashboardPage'
 import HandoverPage from './pages/HandoverPage'
 import ScanPackPage from './pages/ScanPackPage'
+import ScanPackHistoryPage from './pages/ScanPackHistoryPage'
 import StockCountPage from './pages/StockCountPage'
 import UserManagementPage from './pages/UserManagementPage'
 
@@ -290,11 +292,59 @@ function App() {
     }
 
     if (
+      currentPage ===
+      'scan-pack-history'
+    ) {
+      return (
+        <ScanPackHistoryPage
+          session={session}
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'scan-pack',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (
+      currentPage ===
+        'cancelled-shipments' &&
+      isAdmin
+    ) {
+      return (
+        <CancelledShipmentsPage
+          loadingLogout={loading}
+          onBack={() =>
+            setCurrentPage(
+              'scan-pack',
+            )
+          }
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (
       currentPage === 'scan-pack'
     ) {
       return (
         <ScanPackPage
+          session={session}
+          isAdmin={isAdmin}
           loadingLogout={loading}
+          onOpenHistory={() =>
+            setCurrentPage(
+              'scan-pack-history',
+            )
+          }
+          onOpenCancelledShipments={() =>
+            setCurrentPage(
+              'cancelled-shipments',
+            )
+          }
           onBack={() =>
             setCurrentPage(
               'dashboard',
@@ -323,7 +373,8 @@ function App() {
     }
 
     if (
-      currentPage === 'user-management' &&
+      currentPage ===
+        'user-management' &&
       isAdmin
     ) {
       return (

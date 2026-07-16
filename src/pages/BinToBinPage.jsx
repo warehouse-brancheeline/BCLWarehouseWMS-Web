@@ -684,23 +684,73 @@ function BinToBinPage({
         </div>
 
         <div className="bbt-header-actions">
-          {selectedTransfer ? (
-            <>
-              <button className="bbt-secondary-button" type="button" onClick={() => setSelectedTransferId(null)}>
-                Daftar Transaksi
-              </button>
-              <button className="bbt-success-button" type="button" onClick={handleDownloadExcel}>
-                Download Excel
-              </button>
-            </>
-          ) : (
-            <button className="bbt-secondary-button" type="button" onClick={onBack}>
-              Kembali
-            </button>
-          )}
+          <button
+            className="bbt-secondary-button"
+            type="button"
+            onClick={() => {
+              if (selectedTransfer) {
+                setSelectedTransferId(null)
+                setSearch('')
+              } else {
+                onBack()
+              }
+            }}
+            title={
+              selectedTransfer
+                ? 'Kembali ke Daftar Transaksi'
+                : 'Kembali ke Dashboard'
+            }
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
 
-          <button className="bbt-secondary-button" type="button" disabled={loadingLogout} onClick={onLogout}>
-            {loadingLogout ? 'Keluar...' : 'Logout'}
+            <span>Kembali</span>
+          </button>
+
+          <button
+            className="bbt-secondary-button"
+            type="button"
+            disabled={loading}
+            onClick={() =>
+              loadHistory({
+                preserveSelection:
+                  Boolean(selectedTransfer),
+              })
+            }
+          >
+            {loading ? 'Memuat...' : 'Refresh'}
+          </button>
+
+          {selectedTransfer ? (
+            <button
+              className="bbt-primary-button"
+              type="button"
+              onClick={handleDownloadExcel}
+            >
+              Download Excel
+            </button>
+          ) : null}
+
+          <button
+            className="bbt-secondary-button"
+            type="button"
+            disabled={loadingLogout}
+            onClick={onLogout}
+          >
+            {loadingLogout
+              ? 'Keluar...'
+              : 'Logout'}
           </button>
         </div>
       </header>
@@ -934,9 +984,6 @@ function BinToBinPage({
                   onChange={(event) => setSearch(event.target.value)}
                 />
 
-                <button className="bbt-primary-button" type="button" disabled={loading} onClick={loadHistory}>
-                  {loading ? 'Memuat...' : 'Refresh'}
-                </button>
               </div>
             </div>
 

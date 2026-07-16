@@ -204,6 +204,13 @@ function HandoverPage({
   const [previewImage, setPreviewImage] = useState(null)
   const [photoLoadError, setPhotoLoadError] = useState(false)
   const [signatureLoadError, setSignatureLoadError] = useState(false)
+  const [cancelTarget, setCancelTarget] =
+    useState(null)
+
+  const [
+    cancellingItemId,
+    setCancellingItemId,
+  ] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -541,6 +548,128 @@ function HandoverPage({
     } catch (copyError) {
       console.error('Gagal menyalin resi:', copyError)
       setToast('Gagal menyalin nomor resi.')
+    }
+  }
+
+  const getCurrentUserName = async () => {
+    const fallbackName =
+      session?.user?.user_metadata?.full_name ||
+      session?.user?.user_metadata?.name ||
+      session?.user?.email ||
+      'User WMS'
+
+    if (!session?.user?.id) {
+      return fallbackName
+    }
+
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error(
+        'Gagal membaca nama user:',
+        profileError,
+      )
+
+      return fallbackName
+    }
+
+    return (
+      profile?.full_name ||
+      profile?.email ||
+      fallbackName
+    )
+  }
+
+  const handleMarkCancelled = async () => {
+    const target = cancelTarget
+
+    if (!target?.item?.id) {
+      return
+    }
+
+    const itemId = String(target.item.id)
+
+    setCancellingItemId(itemId)
+
+    try {
+      const userName =
+        await getCurrentUserName()
+
+      const {
+        data,
+        error: cancelError,
+      } = await supabase.rpc(
+        'mark_handover_item_cancelled',
+        {
+          p_item_id: target.item.id,
+          p_cancelled_by_name: userName,
+        },
+      )
+
+      if (cancelError) {
+        throw cancelError
+      }
+
+      const cancelledAt =
+        data?.cancelled_at ||
+        data?.cancelledAt ||
+        new Date().toISOString()
+
+      const cancelledByName =
+        data?.cancelled_by_name ||
+        data?.cancelledByName ||
+        userName
+
+      setGroups((currentGroups) =>
+        currentGroups.map((group) => {
+          if (
+            String(group.id) !==
+            String(target.groupId)
+          ) {
+            return group
+          }
+
+          return {
+            ...group,
+            items: (group.items || []).map(
+              (item) =>
+                String(item.id) === itemId
+                  ? {
+                      ...item,
+                      is_cancelled: true,
+                      cancelled_at:
+                        cancelledAt,
+                      cancelled_by_name:
+                        cancelledByName,
+                    }
+                  : item,
+            ),
+          }
+        }),
+      )
+
+      setCancelTarget(null)
+      setToast(
+        'Order berhasil ditandai cancel.',
+      )
+    } catch (cancelError) {
+      console.error(
+        'Gagal menandai order cancel:',
+        cancelError,
+      )
+
+      setToast(
+        'Gagal menandai order cancel. Silakan coba kembali.',
+      )
+    } finally {
+      setCancellingItemId(null)
     }
   }
 
@@ -1003,10 +1132,20 @@ function HandoverPage({
       <>
         <header className="handover-page-header">
           <div className="handover-header-left">
+            <div>
+              <p className="small-label">BCL Warehouse WMS</p>
+              <h1>Detail Group Handover</h1>
+            </div>
+          </div>
+
+          <div className="handover-header-actions">
             <button
-              className="handover-back-button"
+              className="handover-action-button handover-action-button--secondary"
               type="button"
-              onClick={() => setSelectedGroupId(null)}
+              onClick={() => {
+                setSelectedGroupId(null)
+                setDetailSearch('')
+              }}
               title="Kembali ke List Handover"
             >
               <svg
@@ -1018,19 +1157,14 @@ function HandoverPage({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                aria-hidden="true"
               >
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
-              <span>Kembali ke Handover</span>
+
+              <span>Kembali</span>
             </button>
 
-            <div>
-              <p className="small-label">BCL Warehouse WMS</p>
-              <h1>Detail Group Handover</h1>
-            </div>
-          </div>
-
-          <div className="handover-header-actions">
             <button
               className="handover-action-button handover-action-button--secondary"
               type="button"
@@ -1137,6 +1271,8 @@ function HandoverPage({
                     <th>Waktu Scan</th>
                     <th>Alasan Override</th>
                     <th>Catatan</th>
+                    <th>Status Order</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1157,7 +1293,17 @@ function HandoverPage({
                       : '-'
 
                     return (
-                      <tr key={item.id || `${selectedGroup.id}-${index}`}>
+                      <tr
+                        className={
+                          item.is_cancelled
+                            ? 'handover-cancelled-row'
+                            : ''
+                        }
+                        key={
+                          item.id ||
+                          `${selectedGroup.id}-${index}`
+                        }
+                      >
                         <td>{index + 1}</td>
                         <td>
                           <div className="handover-tracking-cell">
@@ -1189,6 +1335,59 @@ function HandoverPage({
                         <td>{formatTime(item.scanned_at)}</td>
                         <td>{item.override_reason || '-'}</td>
                         <td>{item.notes || '-'}</td>
+
+                        <td>
+                          {item.is_cancelled ? (
+                            <div className="handover-cancel-info">
+                              <span className="handover-cancel-badge">
+                                ORDER CANCEL
+                              </span>
+
+                              <small>
+                                Ditandai oleh:{' '}
+                                {item.cancelled_by_name ||
+                                  '-'}
+                              </small>
+
+                              <small>
+                                {formatTime(
+                                  item.cancelled_at,
+                                )}
+                              </small>
+                            </div>
+                          ) : (
+                            <span className="handover-active-order-badge">
+                              Aktif
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          {!item.is_cancelled ? (
+                            <button
+                              className="handover-danger-outline-button"
+                              type="button"
+                              disabled={
+                                cancellingItemId ===
+                                String(item.id)
+                              }
+                              onClick={() =>
+                                setCancelTarget({
+                                  item,
+                                  groupId:
+                                    selectedGroup.id,
+                                })
+                              }
+                            >
+                              {cancellingItemId ===
+                              String(item.id)
+                                ? 'Memproses...'
+                                : 'Tandai Cancel'}
+                            </button>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -1214,7 +1413,17 @@ function HandoverPage({
                   : '-'
 
                 return (
-                  <article className="handover-mobile-card" key={item.id || `${selectedGroup.id}-${index}`}>
+                  <article
+                    className={`handover-mobile-card ${
+                      item.is_cancelled
+                        ? 'handover-cancelled-row'
+                        : ''
+                    }`}
+                    key={
+                      item.id ||
+                      `${selectedGroup.id}-${index}`
+                    }
+                  >
                     <div className="handover-mobile-card-header">
                       <strong>{item.tracking_number || '-'}</strong>
                       <button
@@ -1231,6 +1440,46 @@ function HandoverPage({
                     <p><strong>Waktu Scan:</strong> {formatTime(item.scanned_at)}</p>
                     <p><strong>Alasan Override:</strong> {item.override_reason || '-'}</p>
                     <p><strong>Catatan:</strong> {item.notes || '-'}</p>
+
+                    {item.is_cancelled ? (
+                      <div className="handover-cancel-info">
+                        <span className="handover-cancel-badge">
+                          ORDER CANCEL
+                        </span>
+
+                        <small>
+                          Ditandai oleh:{' '}
+                          {item.cancelled_by_name || '-'}
+                        </small>
+
+                        <small>
+                          {formatTime(
+                            item.cancelled_at,
+                          )}
+                        </small>
+                      </div>
+                    ) : (
+                      <button
+                        className="handover-danger-outline-button"
+                        type="button"
+                        disabled={
+                          cancellingItemId ===
+                          String(item.id)
+                        }
+                        onClick={() =>
+                          setCancelTarget({
+                            item,
+                            groupId:
+                              selectedGroup.id,
+                          })
+                        }
+                      >
+                        {cancellingItemId ===
+                        String(item.id)
+                          ? 'Memproses...'
+                          : 'Tandai Cancel'}
+                      </button>
+                    )}
                   </article>
                 )
               })}
@@ -1365,6 +1614,73 @@ function HandoverPage({
 
       {toast ? (
         <div className="handover-toast">{toast}</div>
+      ) : null}
+
+      {cancelTarget ? (
+        <div
+          className="handover-confirm-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!cancellingItemId) {
+              setCancelTarget(null)
+            }
+          }}
+        >
+          <section
+            className="handover-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-order-title"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <h2 id="cancel-order-title">
+              Tandai Order Cancel
+            </h2>
+
+            <p>
+              Anda yakin ingin menandai order
+              ini sebagai cancel?
+            </p>
+
+            <div className="handover-confirm-reference">
+              Nomor Resi:{' '}
+              <strong>
+                {cancelTarget.item
+                  ?.tracking_number || '-'}
+              </strong>
+            </div>
+
+            <div className="handover-confirm-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={Boolean(
+                  cancellingItemId,
+                )}
+                onClick={() =>
+                  setCancelTarget(null)
+                }
+              >
+                Tidak
+              </button>
+
+              <button
+                className="handover-danger-button"
+                type="button"
+                disabled={Boolean(
+                  cancellingItemId,
+                )}
+                onClick={handleMarkCancelled}
+              >
+                {cancellingItemId
+                  ? 'Memproses...'
+                  : 'Ya'}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {previewImage ? (

@@ -435,3 +435,80 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==================================================
+   STANDARDISASI HEADER ACTION BIN TO BIN
+================================================== */
+
+.bbt-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.bbt-header-actions .bbt-secondary-button,
+.bbt-header-actions .bbt-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.bbt-header-actions .bbt-secondary-button {
+  border: 1px solid #cad2e1;
+  color: #172b55;
+  background: #ffffff;
+}
+
+.bbt-header-actions .bbt-secondary-button:hover:not(:disabled) {
+  border-color: #315ee8;
+  color: #234cc6;
+  background: #f7f9ff;
+}
+
+.bbt-header-actions .bbt-primary-button {
+  border: 1px solid #315ee8;
+  color: #ffffff;
+  background: #315ee8;
+}
+
+.bbt-header-actions .bbt-primary-button:hover:not(:disabled) {
+  background: #274fc9;
+}
+
+.bbt-header-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.bbt-header-actions svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .bbt-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bbt-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .bbt-header-actions .bbt-secondary-button,
+  .bbt-header-actions .bbt-primary-button {
+    flex: 1 1 auto;
+  }
+}
