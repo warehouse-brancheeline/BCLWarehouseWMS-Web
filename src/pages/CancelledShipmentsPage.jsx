@@ -574,32 +574,66 @@ function CancelledShipmentsPage({
         </section>
 
         <section className="cancel-summary-grid">
-          <article className="summary-card">
-            <span>Total Data</span>
+          <article className="cancel-stat-card">
+            <div className="cancel-stat-top">
+              <div className="cancel-stat-icon">
+                📊
+              </div>
 
-            <strong>{rows.length}</strong>
+              <span className="cancel-stat-label">
+                Total Data
+              </span>
+            </div>
+
+            <strong className="cancel-stat-value">
+              {rows.length}
+            </strong>
           </article>
 
-          <article className="summary-card">
-            <span>Cancel Aktif</span>
+          <article className="cancel-stat-card">
+            <div className="cancel-stat-top">
+              <div className="cancel-stat-icon cancel-stat-icon-danger">
+                ⛔
+              </div>
 
-            <strong>{activeCount}</strong>
+              <span className="cancel-stat-label">
+                Cancel Aktif
+              </span>
+            </div>
+
+            <strong className="cancel-stat-value">
+              {activeCount}
+            </strong>
           </article>
 
-          <article className="summary-card">
-            <span>
-              Cancel Setelah Packing
-            </span>
+          <article className="cancel-stat-card">
+            <div className="cancel-stat-top">
+              <div className="cancel-stat-icon cancel-stat-icon-warning">
+                📦
+              </div>
 
-            <strong>{packedCount}</strong>
+              <span className="cancel-stat-label">
+                Cancel Setelah Packing
+              </span>
+            </div>
+
+            <strong className="cancel-stat-value">
+              {packedCount}
+            </strong>
           </article>
 
-          <article className="summary-card">
-            <span>
-              Sudah Handover
-            </span>
+          <article className="cancel-stat-card">
+            <div className="cancel-stat-top">
+              <div className="cancel-stat-icon cancel-stat-icon-success">
+                🚚
+              </div>
 
-            <strong>
+              <span className="cancel-stat-label">
+                Sudah Handover
+              </span>
+            </div>
+
+            <strong className="cancel-stat-value">
               {handedOverCount}
             </strong>
           </article>
