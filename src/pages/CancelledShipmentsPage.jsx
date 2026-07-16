@@ -586,7 +586,7 @@ function CancelledShipmentsPage({
             </div>
 
             <strong className="cancel-stat-value">
-              {rows.length}
+              {filteredRows.length}
             </strong>
           </article>
 

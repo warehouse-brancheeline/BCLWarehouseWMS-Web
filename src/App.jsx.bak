@@ -15,7 +15,7 @@ import ScanPackPage from './pages/ScanPackPage'
 import ScanPackHistoryPage from './pages/ScanPackHistoryPage'
 import StockCountPage from './pages/StockCountPage'
 import UserManagementPage from './pages/UserManagementPage'
-import MasterEkspedisiPage from './pages/MasterEkspedisiPage'
+import CourierMasterPage from './pages/CourierMasterPage'
 
 function App() {
   const [session, setSession] =

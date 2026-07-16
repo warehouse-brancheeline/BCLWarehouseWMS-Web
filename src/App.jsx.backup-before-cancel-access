@@ -15,7 +15,6 @@ import ScanPackPage from './pages/ScanPackPage'
 import ScanPackHistoryPage from './pages/ScanPackHistoryPage'
 import StockCountPage from './pages/StockCountPage'
 import UserManagementPage from './pages/UserManagementPage'
-import MasterEkspedisiPage from './pages/MasterEkspedisiPage'
 
 function App() {
   const [session, setSession] =
@@ -312,7 +311,8 @@ function App() {
 
     if (
       currentPage ===
-        'cancelled-shipments'
+        'cancelled-shipments' &&
+      isAdmin
     ) {
       return (
         <CancelledShipmentsPage
@@ -333,6 +333,7 @@ function App() {
       return (
         <ScanPackPage
           session={session}
+          isAdmin={isAdmin}
           loadingLogout={loading}
           onOpenHistory={() =>
             setCurrentPage(
@@ -397,6 +398,7 @@ function App() {
         error={error}
         profile={profile}
         profileLoading={profileLoading}
+        isAdmin={isAdmin}
         onLogout={handleLogout}
         onOpenBinToBin={() =>
           setCurrentPage(
