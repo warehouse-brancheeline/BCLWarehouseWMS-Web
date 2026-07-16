@@ -3,7 +3,6 @@ import './ScanPackPage.css'
 
 function ScanPackPage({
   session,
-  isAdmin,
   loadingLogout,
   onBack,
   onOpenCancelledShipments,
@@ -11,27 +10,25 @@ function ScanPackPage({
 }) {
   return (
     <div className="scan-pack-history-entry">
-      {isAdmin ? (
-        <div className="scan-pack-history-admin-bar">
-          <div>
-            <p className="scan-pack-history-admin-label">
-              ADMIN SCAN PACK
-            </p>
+      <div className="scan-pack-history-cancel-bar">
+        <div>
+          <p className="scan-pack-history-cancel-label">
+            ORDER CANCEL
+          </p>
 
-            <strong>
-              Pengelolaan Order Cancel
-            </strong>
-          </div>
-
-          <button
-            className="primary-button"
-            type="button"
-            onClick={onOpenCancelledShipments}
-          >
-            Input Resi Cancel
-          </button>
+          <strong>
+            Pengelolaan Order Cancel
+          </strong>
         </div>
-      ) : null}
+
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onOpenCancelledShipments}
+        >
+          Input Resi Cancel
+        </button>
+      </div>
 
       <ScanPackHistoryPage
         session={session}

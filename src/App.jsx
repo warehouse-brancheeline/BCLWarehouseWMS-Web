@@ -311,8 +311,7 @@ function App() {
 
     if (
       currentPage ===
-        'cancelled-shipments' &&
-      isAdmin
+        'cancelled-shipments'
     ) {
       return (
         <CancelledShipmentsPage
@@ -333,7 +332,6 @@ function App() {
       return (
         <ScanPackPage
           session={session}
-          isAdmin={isAdmin}
           loadingLogout={loading}
           onOpenHistory={() =>
             setCurrentPage(
@@ -398,7 +396,6 @@ function App() {
         error={error}
         profile={profile}
         profileLoading={profileLoading}
-        isAdmin={isAdmin}
         onLogout={handleLogout}
         onOpenBinToBin={() =>
           setCurrentPage(

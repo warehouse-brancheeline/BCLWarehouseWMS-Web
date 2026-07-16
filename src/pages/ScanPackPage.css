@@ -494,7 +494,7 @@
   background: #f4f7fb;
 }
 
-.scan-pack-history-admin-bar {
+.scan-pack-history-cancel-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -507,13 +507,13 @@
     0 4px 16px rgba(23, 32, 56, 0.05);
 }
 
-.scan-pack-history-admin-bar strong {
+.scan-pack-history-cancel-bar strong {
   display: block;
   color: #172038;
   font-size: 16px;
 }
 
-.scan-pack-history-admin-label {
+.scan-pack-history-cancel-label {
   margin: 0 0 4px;
   color: #6d778b;
   font-size: 11px;
@@ -522,13 +522,13 @@
 }
 
 @media (max-width: 640px) {
-  .scan-pack-history-admin-bar {
+  .scan-pack-history-cancel-bar {
     align-items: stretch;
     flex-direction: column;
     padding: 14px 18px;
   }
 
-  .scan-pack-history-admin-bar button {
+  .scan-pack-history-cancel-bar button {
     width: 100%;
   }
 }
