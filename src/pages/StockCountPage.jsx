@@ -9,55 +9,14 @@ import {
   writeFileXLSX,
 } from 'xlsx'
 import { supabase } from '../lib/supabase'
+import {
+  formatDate,
+  formatQty,
+  pickValue,
+  safeFilename,
+  toNumber,
+} from '../lib/utils'
 import './StockCountPage.css'
-
-function pickValue(row, keys, fallback = '') {
-  if (!row) {
-    return fallback
-  }
-
-  for (const key of keys) {
-    const value = row[key]
-
-    if (
-      value !== undefined &&
-      value !== null &&
-      value !== ''
-    ) {
-      return value
-    }
-  }
-
-  return fallback
-}
-
-function toNumber(value) {
-  const result = Number(value)
-  return Number.isNaN(result) ? 0 : result
-}
-
-function formatDate(value) {
-  if (!value) {
-    return '-'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return String(value)
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function formatQty(value) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 2,
-  }).format(toNumber(value))
-}
 
 function normalizeStatus(value) {
   return String(value || 'SUBMITTED')
@@ -68,31 +27,16 @@ function normalizeStatus(value) {
 function getStatusClass(status) {
   const value = normalizeStatus(status)
 
-  if (value === 'DRAFT') {
-    return 'stock-status-draft'
+  const classMap = {
+    DRAFT: 'stock-status-draft',
+    IN_PROGRESS: 'stock-status-progress',
+    APPROVED: 'stock-status-approved',
+    REJECTED: 'stock-status-rejected',
+    REVIEWED: 'stock-status-reviewed',
+    ADJUSTED: 'stock-status-adjusted',
   }
 
-  if (value === 'IN_PROGRESS') {
-    return 'stock-status-progress'
-  }
-
-  if (value === 'APPROVED') {
-    return 'stock-status-approved'
-  }
-
-  if (value === 'REJECTED') {
-    return 'stock-status-rejected'
-  }
-
-  if (value === 'REVIEWED') {
-    return 'stock-status-reviewed'
-  }
-
-  if (value === 'ADJUSTED') {
-    return 'stock-status-adjusted'
-  }
-
-  return 'stock-status-submitted'
+  return classMap[value] || 'stock-status-submitted'
 }
 
 function getVarianceClass(value) {
@@ -109,12 +53,6 @@ function getVarianceClass(value) {
   return 'variance-zero'
 }
 
-function safeFilename(value) {
-  return String(value || 'Stock-Count')
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, '_')
-}
-
 function StockCountPage({
   session,
   loadingLogout,
@@ -122,28 +60,18 @@ function StockCountPage({
   onLogout,
 }) {
   const [sessions, setSessions] = useState([])
-  const [selectedSessionId, setSelectedSessionId] =
-    useState(null)
-
+  const [selectedSessionId, setSelectedSessionId] = useState(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reviewNotes, setReviewNotes] = useState('')
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [currentUserName, setCurrentUserName] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
-  // Review panel states
-  const [reviewNotes, setReviewNotes] =
-    useState('')
-  const [reviewLoading, setReviewLoading] =
-    useState(false)
-  const [showConfirmDialog, setShowConfirmDialog] =
-    useState(false)
-  const [confirmAction, setConfirmAction] =
-    useState(null)
-  const [currentUserName, setCurrentUserName] =
-    useState('')
-  const [successMessage, setSuccessMessage] =
-    useState('')
-
-  // Get current user name from session/profile
+  // ── Load current user name ───────────────────────────────────
   useEffect(() => {
     const getUserName = async () => {
       if (!session?.user) {
@@ -151,31 +79,19 @@ function StockCountPage({
       }
 
       try {
-        const userId = session.user.id
-        const userEmail = session.user.email
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', session.user.id)
+          .maybeSingle()
 
-        // Try to get user profile
-        const { data: profile } =
-          await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single()
+        const resolvedName = pickValue(
+          profile,
+          ['full_name', 'name', 'display_name', 'email'],
+          session.user.email,
+        )
 
-        if (profile) {
-          const name = pickValue(
-            profile,
-            [
-              'full_name',
-              'name',
-              'display_name',
-            ],
-            userEmail,
-          )
-          setCurrentUserName(name)
-        } else {
-          setCurrentUserName(userEmail)
-        }
+        setCurrentUserName(String(resolvedName || session.user.email || ''))
       } catch {
         if (session.user.email) {
           setCurrentUserName(session.user.email)
@@ -191,19 +107,9 @@ function StockCountPage({
     setError('')
 
     try {
-      const [
-        sessionResult,
-        itemResult,
-      ] = await Promise.all([
-        supabase
-          .from('stock_count_sessions')
-          .select('*')
-          .limit(1000),
-
-        supabase
-          .from('stock_count_items')
-          .select('*')
-          .limit(10000),
+      const [sessionResult, itemResult] = await Promise.all([
+        supabase.from('stock_count_sessions').select('*').limit(1000),
+        supabase.from('stock_count_items').select('*').limit(10000),
       ])
 
       if (sessionResult.error) {
@@ -214,29 +120,19 @@ function StockCountPage({
         throw itemResult.error
       }
 
-      const sessionRows =
-        sessionResult.data ?? []
+      const sessionRows = sessionResult.data ?? []
+      const itemRows = itemResult.data ?? []
 
-      const itemRows =
-        itemResult.data ?? []
-
+      // ── Kumpulkan ID yang dibutuhkan ─────────────────────────
       const binIds = new Set()
       const skuIds = new Set()
+      const profileIds = new Set()
 
       itemRows.forEach((item) => {
-        const binId = pickValue(
-          item,
-          ['bin_id', 'location_id'],
-          '',
-        )
-
+        const binId = pickValue(item, ['bin_id', 'location_id'], '')
         const skuId = pickValue(
           item,
-          [
-            'sku_id',
-            'item_id',
-            'product_id',
-          ],
+          ['sku_id', 'item_id', 'product_id'],
           '',
         )
 
@@ -249,38 +145,45 @@ function StockCountPage({
         }
       })
 
+      // FIX: Hanya load profiles yang dibutuhkan (bukan semua)
+      sessionRows.forEach((session) => {
+        const userId = pickValue(
+          session,
+          [
+            'created_by',
+            'user_id',
+            'counted_by',
+            'submitted_by',
+            'staff_id',
+          ],
+          '',
+        )
+
+        if (userId) {
+          profileIds.add(String(userId))
+        }
+      })
+
       const binQuery =
         binIds.size > 0
-          ? supabase
-              .from('bins')
-              .select('*')
-              .in('id', Array.from(binIds))
-          : Promise.resolve({
-              data: [],
-              error: null,
-            })
+          ? supabase.from('bins').select('*').in('id', Array.from(binIds))
+          : Promise.resolve({ data: [], error: null })
 
       const skuQuery =
         skuIds.size > 0
+          ? supabase.from('skus').select('*').in('id', Array.from(skuIds))
+          : Promise.resolve({ data: [], error: null })
+
+      // FIX: Hanya query profile yang relevan saja
+      const profileQuery =
+        profileIds.size > 0
           ? supabase
-              .from('skus')
-              .select('*')
-              .in('id', Array.from(skuIds))
-          : Promise.resolve({
-              data: [],
-              error: null,
-            })
+              .from('profiles')
+              .select('id, user_id, auth_user_id, full_name, name, display_name, email')
+              .in('id', Array.from(profileIds))
+          : Promise.resolve({ data: [], error: null })
 
-      const profileQuery = supabase
-        .from('profiles')
-        .select('*')
-        .limit(1000)
-
-      const [
-        binResult,
-        skuResult,
-        profileResult,
-      ] = await Promise.all([
+      const [binResult, skuResult, profileResult] = await Promise.all([
         binQuery,
         skuQuery,
         profileQuery,
@@ -295,433 +198,258 @@ function StockCountPage({
       }
 
       if (profileResult.error) {
-        console.warn(
-          'Profiles gagal dimuat:',
-          profileResult.error,
-        )
+        console.warn('Profiles gagal dimuat:', profileResult.error)
       }
 
       const binsById = new Map(
-        (binResult.data ?? []).map((bin) => [
-          String(bin.id),
-          bin,
-        ]),
+        (binResult.data ?? []).map((bin) => [String(bin.id), bin]),
       )
 
       const skusById = new Map(
-        (skuResult.data ?? []).map((sku) => [
-          String(sku.id),
-          sku,
-        ]),
+        (skuResult.data ?? []).map((sku) => [String(sku.id), sku]),
       )
 
       const profilesById = new Map()
 
-      ;(profileResult.data ?? []).forEach(
-        (profile) => {
-          const possibleIds = [
-            profile.id,
-            profile.user_id,
-            profile.auth_user_id,
-          ]
+      ;(profileResult.data ?? []).forEach((profile) => {
+        const possibleIds = [
+          profile.id,
+          profile.user_id,
+          profile.auth_user_id,
+        ]
 
-          possibleIds.forEach((id) => {
-            if (id) {
-              profilesById.set(
-                String(id),
-                profile,
-              )
-            }
-          })
-        },
-      )
+        possibleIds.forEach((id) => {
+          if (id) {
+            profilesById.set(String(id), profile)
+          }
+        })
+      })
 
-      const normalizedItems = itemRows.map(
-        (item) => {
-          const sessionId = String(
-            pickValue(
-              item,
-              [
-                'stock_count_session_id',
-                'stock_count_id',
-                'count_id',
-                'session_id',
-              ],
-              '',
-            ),
-          )
-
-          const binId = String(
-            pickValue(
-              item,
-              ['bin_id', 'location_id'],
-              '',
-            ),
-          )
-
-          const skuId = String(
-            pickValue(
-              item,
-              [
-                'sku_id',
-                'item_id',
-                'product_id',
-              ],
-              '',
-            ),
-          )
-
-          const bin = binsById.get(binId)
-          const sku = skusById.get(skuId)
-
-          const systemQty = toNumber(
-            pickValue(
-              item,
-              [
-                'system_qty',
-                'expected_qty',
-                'book_qty',
-                'qty_system',
-                'current_qty',
-              ],
-              0,
-            ),
-          )
-
-          const actualQty = toNumber(
-            pickValue(
-              item,
-              [
-                'actual_qty',
-                'counted_qty',
-                'physical_qty',
-                'qty_actual',
-                'count_qty',
-                'qty',
-              ],
-              0,
-            ),
-          )
-
-          const savedVariance = pickValue(
+      const normalizedItems = itemRows.map((item) => {
+        const sessionId = String(
+          pickValue(
             item,
             [
-              'variance',
-              'difference',
-              'variance_qty',
-              'difference_qty',
+              'stock_count_session_id',
+              'stock_count_id',
+              'count_id',
+              'session_id',
             ],
             '',
-          )
+          ),
+        )
 
-          const variance =
-            savedVariance === ''
-              ? actualQty - systemQty
-              : toNumber(savedVariance)
+        const binId = String(
+          pickValue(item, ['bin_id', 'location_id'], ''),
+        )
 
-          return {
-            id: pickValue(
+        const skuId = String(
+          pickValue(item, ['sku_id', 'item_id', 'product_id'], ''),
+        )
+
+        const bin = binsById.get(binId)
+        const sku = skusById.get(skuId)
+
+        const systemQty = toNumber(
+          pickValue(
+            item,
+            [
+              'system_qty',
+              'expected_qty',
+              'book_qty',
+              'qty_system',
+              'current_qty',
+            ],
+            0,
+          ),
+        )
+
+        const actualQty = toNumber(
+          pickValue(
+            item,
+            [
+              'actual_qty',
+              'counted_qty',
+              'physical_qty',
+              'qty_actual',
+              'count_qty',
+              'qty',
+            ],
+            0,
+          ),
+        )
+
+        const savedVariance = pickValue(
+          item,
+          ['variance', 'difference', 'variance_qty', 'difference_qty'],
+          '',
+        )
+
+        const variance =
+          savedVariance === ''
+            ? actualQty - systemQty
+            : toNumber(savedVariance)
+
+        return {
+          id: pickValue(item, ['id'], crypto.randomUUID()),
+          sessionId,
+          binCode: pickValue(
+            bin,
+            ['bin_code', 'code', 'location_code', 'name'],
+            pickValue(
               item,
-              ['id'],
-              crypto.randomUUID(),
-            ),
-
-            sessionId,
-
-            binCode: pickValue(
-              bin,
-              [
-                'bin_code',
-                'code',
-                'location_code',
-                'name',
-              ],
-              pickValue(
-                item,
-                [
-                  'bin_code',
-                  'location_code',
-                  'bin',
-                  'location',
-                ],
-                '-',
-              ),
-            ),
-
-            skuCode: pickValue(
-              sku,
-              [
-                'sku_code',
-                'code',
-                'sku',
-              ],
-              pickValue(
-                item,
-                [
-                  'sku_code',
-                  'sku',
-                  'item_code',
-                ],
-                '-',
-              ),
-            ),
-
-            skuName: pickValue(
-              sku,
-              [
-                'sku_name',
-                'name',
-                'description',
-                'product_name',
-              ],
-              pickValue(
-                item,
-                [
-                  'sku_name',
-                  'description',
-                  'product_name',
-                ],
-                '-',
-              ),
-            ),
-
-            systemQty,
-            actualQty,
-            variance,
-
-            notes: pickValue(
-              item,
-              [
-                'notes',
-                'remarks',
-                'note',
-              ],
+              ['bin_code', 'location_code', 'bin', 'location'],
               '-',
             ),
-
-            createdAt: pickValue(
+          ),
+          skuCode: pickValue(
+            sku,
+            ['sku_code', 'code', 'sku'],
+            pickValue(item, ['sku_code', 'sku', 'item_code'], '-'),
+          ),
+          skuName: pickValue(
+            sku,
+            ['sku_name', 'name', 'description', 'product_name'],
+            pickValue(
               item,
-              [
-                'created_at',
-                'counted_at',
-                'updated_at',
-              ],
-              '',
+              ['sku_name', 'description', 'product_name'],
+              '-',
             ),
-          }
-        },
-      )
+          ),
+          systemQty,
+          actualQty,
+          variance,
+          notes: pickValue(item, ['notes', 'remarks', 'note'], '-'),
+          createdAt: pickValue(
+            item,
+            ['created_at', 'counted_at', 'updated_at'],
+            '',
+          ),
+        }
+      })
 
       const itemsBySession = new Map()
 
       normalizedItems.forEach((item) => {
-        if (
-          !itemsBySession.has(item.sessionId)
-        ) {
-          itemsBySession.set(
-            item.sessionId,
-            [],
-          )
+        if (!itemsBySession.has(item.sessionId)) {
+          itemsBySession.set(item.sessionId, [])
         }
 
-        itemsBySession
-          .get(item.sessionId)
-          .push(item)
+        itemsBySession.get(item.sessionId).push(item)
       })
 
-      const normalizedSessions =
-        sessionRows.map((session) => {
-          const sessionId = String(
-            pickValue(
-              session,
-              ['id'],
-              '',
-            ),
-          )
+      const normalizedSessions = sessionRows.map((session) => {
+        const sessionId = String(pickValue(session, ['id'], ''))
+        const items = itemsBySession.get(sessionId) ?? []
 
-          const items =
-            itemsBySession.get(sessionId) ?? []
-
-          const userId = String(
-            pickValue(
-              session,
-              [
-                'created_by',
-                'user_id',
-                'counted_by',
-                'submitted_by',
-                'staff_id',
-              ],
-              '',
-            ),
-          )
-
-          const profile =
-            profilesById.get(userId)
-
-          const transactionNumber =
-            pickValue(
-              session,
-              [
-                'transaction_number',
-                'count_number',
-                'session_number',
-                'stock_count_number',
-                'reference_no',
-                'document_number',
-              ],
-              sessionId
-                ? `SC-${sessionId
-                    .slice(0, 8)
-                    .toUpperCase()}`
-                : '-',
-            )
-
-          const staffName = pickValue(
+        const userId = String(
+          pickValue(
             session,
             [
-              'staff_name',
-              'created_by_name',
-              'counter_name',
-              'counted_by_name',
-              'user_name',
-              'user_email',
+              'created_by',
+              'user_id',
+              'counted_by',
+              'submitted_by',
+              'staff_id',
             ],
-            pickValue(
-              profile,
-              [
-                'full_name',
-                'name',
-                'display_name',
-                'email',
-              ],
-              userId
-                ? userId.slice(0, 8)
-                : '-',
-            ),
-          )
+            '',
+          ),
+        )
 
-          const totalSystemQty =
-            items.reduce(
-              (total, item) =>
-                total + item.systemQty,
-              0,
-            )
+        const profile = profilesById.get(userId)
 
-          const totalActualQty =
-            items.reduce(
-              (total, item) =>
-                total + item.actualQty,
-              0,
-            )
+        const transactionNumber = pickValue(
+          session,
+          [
+            'transaction_number',
+            'count_number',
+            'session_number',
+            'stock_count_number',
+            'reference_no',
+            'document_number',
+          ],
+          sessionId
+            ? `SC-${sessionId.slice(0, 8).toUpperCase()}`
+            : '-',
+        )
 
-          const totalVariance =
-            items.reduce(
-              (total, item) =>
-                total + item.variance,
-              0,
-            )
+        const staffName = pickValue(
+          session,
+          [
+            'staff_name',
+            'created_by_name',
+            'counter_name',
+            'counted_by_name',
+            'user_name',
+            'user_email',
+          ],
+          pickValue(
+            profile,
+            ['full_name', 'name', 'display_name', 'email'],
+            userId ? userId.slice(0, 8) : '-',
+          ),
+        )
 
-          return {
-            id: sessionId,
-            transactionNumber,
-            staffName,
+        const totalSystemQty = items.reduce(
+          (total, item) => total + item.systemQty,
+          0,
+        )
 
-            status: normalizeStatus(
-              pickValue(
-                session,
-                ['status'],
-                'SUBMITTED',
-              ),
-            ),
+        const totalActualQty = items.reduce(
+          (total, item) => total + item.actualQty,
+          0,
+        )
 
-            notes: pickValue(
-              session,
-              [
-                'notes',
-                'remarks',
-                'note',
-              ],
-              '-',
-            ),
+        const totalVariance = items.reduce(
+          (total, item) => total + item.variance,
+          0,
+        )
 
-            createdAt: pickValue(
-              session,
-              [
-                'submitted_at',
-                'created_at',
-                'count_date',
-                'updated_at',
-              ],
-              '',
-            ),
-
-            // Review fields
-            reviewNotes: pickValue(
-              session,
-              ['review_notes'],
-              '',
-            ),
-            reviewedByName: pickValue(
-              session,
-              ['reviewed_by_name'],
-              '',
-            ),
-            reviewedAt: pickValue(
-              session,
-              ['reviewed_at'],
-              '',
-            ),
-            approvedByName: pickValue(
-              session,
-              ['approved_by_name'],
-              '',
-            ),
-            approvedAt: pickValue(
-              session,
-              ['approved_at'],
-              '',
-            ),
-            rejectedByName: pickValue(
-              session,
-              ['rejected_by_name'],
-              '',
-            ),
-            rejectedAt: pickValue(
-              session,
-              ['rejected_at'],
-              '',
-            ),
-
-            itemCount: items.length,
-            totalSystemQty,
-            totalActualQty,
-            totalVariance,
-            items,
-          }
-        })
+        return {
+          id: sessionId,
+          transactionNumber,
+          staffName,
+          status: normalizeStatus(
+            pickValue(session, ['status'], 'SUBMITTED'),
+          ),
+          notes: pickValue(session, ['notes', 'remarks', 'note'], '-'),
+          createdAt: pickValue(
+            session,
+            [
+              'submitted_at',
+              'created_at',
+              'count_date',
+              'updated_at',
+            ],
+            '',
+          ),
+          reviewNotes: pickValue(session, ['review_notes'], ''),
+          reviewedByName: pickValue(session, ['reviewed_by_name'], ''),
+          reviewedAt: pickValue(session, ['reviewed_at'], ''),
+          approvedByName: pickValue(session, ['approved_by_name'], ''),
+          approvedAt: pickValue(session, ['approved_at'], ''),
+          rejectedByName: pickValue(session, ['rejected_by_name'], ''),
+          rejectedAt: pickValue(session, ['rejected_at'], ''),
+          itemCount: items.length,
+          totalSystemQty,
+          totalActualQty,
+          totalVariance,
+          items,
+        }
+      })
 
       normalizedSessions.sort((a, b) => {
-        const dateA =
-          new Date(a.createdAt)
-            .getTime() || 0
-
-        const dateB =
-          new Date(b.createdAt)
-            .getTime() || 0
-
+        const dateA = new Date(a.createdAt).getTime() || 0
+        const dateB = new Date(b.createdAt).getTime() || 0
         return dateB - dateA
       })
 
       setSessions(normalizedSessions)
     } catch (loadError) {
       console.error(loadError)
-
       setSessions([])
-
       setError(
-        loadError?.message ||
-          'Data Stock Count gagal dimuat.',
+        loadError?.message || 'Data Stock Count gagal dimuat.',
       )
     } finally {
       setLoading(false)
@@ -733,8 +461,7 @@ function StockCountPage({
   }, [loadData])
 
   const filteredSessions = useMemo(() => {
-    const keyword =
-      search.trim().toLowerCase()
+    const keyword = search.trim().toLowerCase()
 
     if (!keyword) {
       return sessions
@@ -747,29 +474,20 @@ function StockCountPage({
         session.status,
         session.notes,
       ].some((value) =>
-        String(value)
-          .toLowerCase()
-          .includes(keyword),
+        String(value).toLowerCase().includes(keyword),
       ),
     )
   }, [sessions, search])
 
   const selectedSession = useMemo(
     () =>
-      sessions.find(
-        (session) =>
-          session.id === selectedSessionId,
-      ) ?? null,
+      sessions.find((session) => session.id === selectedSessionId) ?? null,
     [sessions, selectedSessionId],
   )
 
   const totalItems = useMemo(
     () =>
-      sessions.reduce(
-        (total, session) =>
-          total + session.itemCount,
-        0,
-      ),
+      sessions.reduce((total, session) => total + session.itemCount, 0),
     [sessions],
   )
 
@@ -777,32 +495,19 @@ function StockCountPage({
     () =>
       new Set(
         sessions
-          .map((session) =>
-            session.staffName.trim(),
-          )
-          .filter(
-            (name) =>
-              name &&
-              name !== '-',
-          ),
+          .map((session) => session.staffName.trim())
+          .filter((name) => name && name !== '-'),
       ).size,
     [sessions],
   )
 
-  // Check if review buttons should be enabled
   const isReviewDisabled = useMemo(() => {
     if (!selectedSession) {
       return true
     }
 
-    const status = normalizeStatus(
-      selectedSession.status,
-    )
-
-    return (
-      status === 'APPROVED' ||
-      status === 'REJECTED'
-    )
+    const status = normalizeStatus(selectedSession.status)
+    return status === 'APPROVED' || status === 'REJECTED'
   }, [selectedSession])
 
   const canMarkReviewed = useMemo(() => {
@@ -810,10 +515,7 @@ function StockCountPage({
       return false
     }
 
-    const status = normalizeStatus(
-      selectedSession.status,
-    )
-
+    const status = normalizeStatus(selectedSession.status)
     return status === 'SUBMITTED'
   }, [selectedSession, isReviewDisabled])
 
@@ -822,14 +524,8 @@ function StockCountPage({
       return false
     }
 
-    const status = normalizeStatus(
-      selectedSession.status,
-    )
-
-    return (
-      status === 'SUBMITTED' ||
-      status === 'REVIEWED'
-    )
+    const status = normalizeStatus(selectedSession.status)
+    return status === 'SUBMITTED' || status === 'REVIEWED'
   }, [selectedSession, isReviewDisabled])
 
   const canReject = useMemo(() => {
@@ -837,17 +533,10 @@ function StockCountPage({
       return false
     }
 
-    const status = normalizeStatus(
-      selectedSession.status,
-    )
-
-    return (
-      status === 'SUBMITTED' ||
-      status === 'REVIEWED'
-    )
+    const status = normalizeStatus(selectedSession.status)
+    return status === 'SUBMITTED' || status === 'REVIEWED'
   }, [selectedSession, isReviewDisabled])
 
-  // Handle review action
   const handleReviewAction = useCallback(
     async (action) => {
       if (!selectedSession || !currentUserName) {
@@ -855,83 +544,61 @@ function StockCountPage({
         return
       }
 
-      // Validate reject requires notes
-      if (
-        action === 'REJECTED' &&
-        !reviewNotes.trim()
-      ) {
+      if (action === 'REJECTED' && !reviewNotes.trim()) {
         setError('Catatan wajib diisi untuk Reject.')
         return
       }
 
-      setConfirmAction({
-        action,
-        notes: reviewNotes,
-      })
+      setConfirmAction({ action, notes: reviewNotes })
       setShowConfirmDialog(true)
     },
     [selectedSession, currentUserName, reviewNotes],
   )
 
-  // Execute review action
-  const executeReviewAction = useCallback(
-    async () => {
-      if (
-        !confirmAction ||
-        !selectedSession ||
-        !currentUserName
-      ) {
-        return
+  const executeReviewAction = useCallback(async () => {
+    if (!confirmAction || !selectedSession || !currentUserName) {
+      return
+    }
+
+    setShowConfirmDialog(false)
+    setReviewLoading(true)
+    setError('')
+
+    try {
+      const { error: rpcError } = await supabase.rpc(
+        'review_stock_count_session',
+        {
+          p_session_id: selectedSession.id,
+          p_action: confirmAction.action,
+          p_reviewer_name: currentUserName,
+          p_review_notes: confirmAction.notes || null,
+        },
+      )
+
+      if (rpcError) {
+        throw rpcError
       }
 
-      setShowConfirmDialog(false)
-      setReviewLoading(true)
-      setError('')
+      setSuccessMessage(
+        `Transaksi berhasil di-${confirmAction.action.toLowerCase()}.`,
+      )
+      setReviewNotes('')
+      setConfirmAction(null)
 
-      try {
-        const { error: rpcError } =
-          await supabase.rpc(
-            'review_stock_count_session',
-            {
-              p_session_id: selectedSession.id,
-              p_action: confirmAction.action,
-              p_reviewer_name: currentUserName,
-              p_review_notes:
-                confirmAction.notes || null,
-            },
-          )
+      await loadData()
 
-        if (rpcError) {
-          throw rpcError
-        }
-
-        // Success
-        setSuccessMessage(
-          `Transaksi berhasil di-${confirmAction.action.toLowerCase()}.`,
-        )
-        setReviewNotes('')
-        setConfirmAction(null)
-
-        // Reload data
-        await loadData()
-
-        // Clear success message after 3 seconds
-        setTimeout(() => {
-          setSuccessMessage('')
-        }, 3000)
-      } catch (reviewError) {
-        console.error(reviewError)
-
-        setError(
-          reviewError?.message ||
-            'Gagal memproses review transaksi.',
-        )
-      } finally {
-        setReviewLoading(false)
-      }
-    },
-    [confirmAction, selectedSession, currentUserName, loadData],
-  )
+      setTimeout(() => {
+        setSuccessMessage('')
+      }, 3000)
+    } catch (reviewError) {
+      console.error(reviewError)
+      setError(
+        reviewError?.message || 'Gagal memproses review transaksi.',
+      )
+    } finally {
+      setReviewLoading(false)
+    }
+  }, [confirmAction, selectedSession, currentUserName, loadData])
 
   const downloadExcel = () => {
     if (!selectedSession) {
@@ -942,52 +609,19 @@ function StockCountPage({
       ['BCL Warehouse WMS'],
       ['Laporan Stock Count'],
       [],
-      [
-        'Nomor Transaksi',
-        selectedSession.transactionNumber,
-      ],
-      [
-        'Staff Penghitung',
-        selectedSession.staffName,
-      ],
-      [
-        'Tanggal',
-        formatDate(
-          selectedSession.createdAt,
-        ),
-      ],
-      [
-        'Status',
-        selectedSession.status,
-      ],
-      [
-        'Total Baris',
-        selectedSession.itemCount,
-      ],
-      [
-        'Total Qty Sistem',
-        selectedSession.totalSystemQty,
-      ],
-      [
-        'Total Qty Aktual',
-        selectedSession.totalActualQty,
-      ],
-      [
-        'Total Selisih',
-        selectedSession.totalVariance,
-      ],
-      [
-        'Catatan Sesi',
-        selectedSession.notes,
-      ],
+      ['Nomor Transaksi', selectedSession.transactionNumber],
+      ['Staff Penghitung', selectedSession.staffName],
+      ['Tanggal', formatDate(selectedSession.createdAt)],
+      ['Status', selectedSession.status],
+      ['Total Baris', selectedSession.itemCount],
+      ['Total Qty Sistem', selectedSession.totalSystemQty],
+      ['Total Qty Aktual', selectedSession.totalActualQty],
+      ['Total Selisih', selectedSession.totalVariance],
+      ['Catatan Sesi', selectedSession.notes],
     ]
 
-    // Add review information if available
     if (selectedSession.reviewedByName) {
-      summaryRows.push([
-        'Direview Oleh',
-        selectedSession.reviewedByName,
-      ])
+      summaryRows.push(['Direview Oleh', selectedSession.reviewedByName])
       summaryRows.push([
         'Tanggal Review',
         formatDate(selectedSession.reviewedAt),
@@ -995,10 +629,7 @@ function StockCountPage({
     }
 
     if (selectedSession.approvedByName) {
-      summaryRows.push([
-        'Disetujui Oleh',
-        selectedSession.approvedByName,
-      ])
+      summaryRows.push(['Disetujui Oleh', selectedSession.approvedByName])
       summaryRows.push([
         'Tanggal Persetujuan',
         formatDate(selectedSession.approvedAt),
@@ -1006,10 +637,7 @@ function StockCountPage({
     }
 
     if (selectedSession.rejectedByName) {
-      summaryRows.push([
-        'Ditolak Oleh',
-        selectedSession.rejectedByName,
-      ])
+      summaryRows.push(['Ditolak Oleh', selectedSession.rejectedByName])
       summaryRows.push([
         'Tanggal Penolakan',
         formatDate(selectedSession.rejectedAt),
@@ -1017,43 +645,26 @@ function StockCountPage({
     }
 
     if (selectedSession.reviewNotes) {
-      summaryRows.push([
-        'Catatan Review',
-        selectedSession.reviewNotes,
-      ])
+      summaryRows.push(['Catatan Review', selectedSession.reviewNotes])
     }
 
-    const detailRows =
-      selectedSession.items.map(
-        (item, index) => ({
-          No: index + 1,
-          Lokasi: item.binCode,
-          SKU: item.skuCode,
-          Deskripsi: item.skuName,
-          'Qty Sistem': item.systemQty,
-          'Qty Aktual': item.actualQty,
-          Selisih: item.variance,
-          Catatan: item.notes,
-          'Waktu Input': formatDate(
-            item.createdAt,
-          ),
-        }),
-      )
+    const detailRows = selectedSession.items.map((item, index) => ({
+      No: index + 1,
+      Lokasi: item.binCode,
+      SKU: item.skuCode,
+      Deskripsi: item.skuName,
+      'Qty Sistem': item.systemQty,
+      'Qty Aktual': item.actualQty,
+      Selisih: item.variance,
+      Catatan: item.notes,
+      'Waktu Input': formatDate(item.createdAt),
+    }))
 
-    const workbook =
-      utils.book_new()
+    const workbook = utils.book_new()
+    const summarySheet = utils.aoa_to_sheet(summaryRows)
+    const detailSheet = utils.json_to_sheet(detailRows)
 
-    const summarySheet =
-      utils.aoa_to_sheet(summaryRows)
-
-    const detailSheet =
-      utils.json_to_sheet(detailRows)
-
-    summarySheet['!cols'] = [
-      { wch: 24 },
-      { wch: 35 },
-    ]
-
+    summarySheet['!cols'] = [{ wch: 24 }, { wch: 35 }]
     detailSheet['!cols'] = [
       { wch: 7 },
       { wch: 18 },
@@ -1066,30 +677,14 @@ function StockCountPage({
       { wch: 22 },
     ]
 
-    utils.book_append_sheet(
-      workbook,
-      summarySheet,
-      'Ringkasan',
-    )
+    utils.book_append_sheet(workbook, summarySheet, 'Ringkasan')
+    utils.book_append_sheet(workbook, detailSheet, 'Detail Stock Count')
 
-    utils.book_append_sheet(
-      workbook,
-      detailSheet,
-      'Detail Stock Count',
-    )
+    const filename = `Stock_Count_${safeFilename(
+      selectedSession.transactionNumber,
+    )}.xlsx`
 
-    const filename =
-      `Stock_Count_${safeFilename(
-        selectedSession.transactionNumber,
-      )}.xlsx`
-
-    writeFileXLSX(
-      workbook,
-      filename,
-      {
-        compression: true,
-      },
-    )
+    writeFileXLSX(workbook, filename, { compression: true })
   }
 
   if (selectedSession) {
@@ -1097,22 +692,15 @@ function StockCountPage({
       <main className="dashboard-page">
         <header className="dashboard-header">
           <div>
-            <p className="small-label">
-              BCL Warehouse WMS
-            </p>
-
-            <h1>
-              Detail Stock Count
-            </h1>
+            <p className="small-label">BCL Warehouse WMS</p>
+            <h1>Detail Stock Count</h1>
           </div>
 
           <div className="stock-header-actions">
             <button
               className="secondary-button"
               type="button"
-              onClick={() =>
-                setSelectedSessionId(null)
-              }
+              onClick={() => setSelectedSessionId(null)}
             >
               Daftar Transaksi
             </button>
@@ -1131,9 +719,7 @@ function StockCountPage({
               disabled={loadingLogout}
               onClick={onLogout}
             >
-              {loadingLogout
-                ? 'Keluar...'
-                : 'Logout'}
+              {loadingLogout ? 'Keluar...' : 'Logout'}
             </button>
           </div>
         </header>
@@ -1142,33 +728,18 @@ function StockCountPage({
           <div className="transaction-info-card">
             <div>
               <span>Nomor Transaksi</span>
-              <strong>
-                {
-                  selectedSession
-                    .transactionNumber
-                }
-              </strong>
+              <strong>{selectedSession.transactionNumber}</strong>
             </div>
-
             <div>
               <span>Staff Penghitung</span>
-              <strong>
-                {selectedSession.staffName}
-              </strong>
+              <strong>{selectedSession.staffName}</strong>
             </div>
-
             <div>
               <span>Tanggal</span>
-              <strong>
-                {formatDate(
-                  selectedSession.createdAt,
-                )}
-              </strong>
+              <strong>{formatDate(selectedSession.createdAt)}</strong>
             </div>
-
             <div>
               <span>Status</span>
-
               <strong>
                 <span
                   className={`stock-status-label ${getStatusClass(
@@ -1184,57 +755,27 @@ function StockCountPage({
           <div className="stock-summary-grid">
             <article className="stock-summary-card">
               <span>Total Baris</span>
-              <strong>
-                {
-                  selectedSession
-                    .itemCount
-                }
-              </strong>
+              <strong>{selectedSession.itemCount}</strong>
             </article>
-
             <article className="stock-summary-card">
               <span>Total Qty Sistem</span>
-              <strong>
-                {formatQty(
-                  selectedSession
-                    .totalSystemQty,
-                )}
-              </strong>
+              <strong>{formatQty(selectedSession.totalSystemQty)}</strong>
             </article>
-
             <article className="stock-summary-card">
               <span>Total Qty Aktual</span>
-              <strong>
-                {formatQty(
-                  selectedSession
-                    .totalActualQty,
-                )}
-              </strong>
+              <strong>{formatQty(selectedSession.totalActualQty)}</strong>
             </article>
-
             <article className="stock-summary-card">
               <span>Total Selisih</span>
-
               <strong
-                className={getVarianceClass(
-                  selectedSession
-                    .totalVariance,
-                )}
+                className={getVarianceClass(selectedSession.totalVariance)}
               >
-                {selectedSession
-                    .totalVariance > 0
-                  ? '+'
-                  : ''}
-
-                {formatQty(
-                  selectedSession
-                    .totalVariance,
-                )}
+                {selectedSession.totalVariance > 0 ? '+' : ''}
+                {formatQty(selectedSession.totalVariance)}
               </strong>
             </article>
           </div>
 
-          {/* Review Information Panel */}
           <div className="stock-review-info-card">
             <div className="stock-review-info-header">
               <h3>Informasi Review</h3>
@@ -1244,24 +785,13 @@ function StockCountPage({
               {selectedSession.reviewedByName && (
                 <>
                   <div>
-                    <span>
-                      Direview Oleh
-                    </span>
-                    <strong>
-                      {
-                        selectedSession.reviewedByName
-                      }
-                    </strong>
+                    <span>Direview Oleh</span>
+                    <strong>{selectedSession.reviewedByName}</strong>
                   </div>
-
                   <div>
-                    <span>
-                      Tanggal Review
-                    </span>
+                    <span>Tanggal Review</span>
                     <strong>
-                      {formatDate(
-                        selectedSession.reviewedAt,
-                      )}
+                      {formatDate(selectedSession.reviewedAt)}
                     </strong>
                   </div>
                 </>
@@ -1270,24 +800,13 @@ function StockCountPage({
               {selectedSession.approvedByName && (
                 <>
                   <div>
-                    <span>
-                      Disetujui Oleh
-                    </span>
-                    <strong>
-                      {
-                        selectedSession.approvedByName
-                      }
-                    </strong>
+                    <span>Disetujui Oleh</span>
+                    <strong>{selectedSession.approvedByName}</strong>
                   </div>
-
                   <div>
-                    <span>
-                      Tanggal Persetujuan
-                    </span>
+                    <span>Tanggal Persetujuan</span>
                     <strong>
-                      {formatDate(
-                        selectedSession.approvedAt,
-                      )}
+                      {formatDate(selectedSession.approvedAt)}
                     </strong>
                   </div>
                 </>
@@ -1296,24 +815,13 @@ function StockCountPage({
               {selectedSession.rejectedByName && (
                 <>
                   <div>
-                    <span>
-                      Ditolak Oleh
-                    </span>
-                    <strong>
-                      {
-                        selectedSession.rejectedByName
-                      }
-                    </strong>
+                    <span>Ditolak Oleh</span>
+                    <strong>{selectedSession.rejectedByName}</strong>
                   </div>
-
                   <div>
-                    <span>
-                      Tanggal Penolakan
-                    </span>
+                    <span>Tanggal Penolakan</span>
                     <strong>
-                      {formatDate(
-                        selectedSession.rejectedAt,
-                      )}
+                      {formatDate(selectedSession.rejectedAt)}
                     </strong>
                   </div>
                 </>
@@ -1323,16 +831,13 @@ function StockCountPage({
                 <div className="stock-review-notes-full">
                   <span>Catatan Review</span>
                   <div className="stock-review-notes-text">
-                    {
-                      selectedSession.reviewNotes
-                    }
+                    {selectedSession.reviewNotes}
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Review Panel */}
           {!isReviewDisabled && (
             <div className="stock-review-panel">
               <div className="stock-review-header">
@@ -1341,10 +846,7 @@ function StockCountPage({
 
               <div className="stock-review-form">
                 <div className="stock-review-notes-field">
-                  <label htmlFor="review-notes">
-                    Catatan Review
-                  </label>
-
+                  <label htmlFor="review-notes">Catatan Review</label>
                   <textarea
                     id="review-notes"
                     className="stock-review-textarea"
@@ -1352,9 +854,7 @@ function StockCountPage({
                     placeholder="Masukkan catatan review (opsional, kecuali untuk Reject)"
                     disabled={reviewLoading}
                     onChange={(event) =>
-                      setReviewNotes(
-                        event.target.value,
-                      )
+                      setReviewNotes(event.target.value)
                     }
                     rows="4"
                   />
@@ -1366,15 +866,9 @@ function StockCountPage({
                       className="stock-review-button stock-reviewed-button"
                       type="button"
                       disabled={reviewLoading}
-                      onClick={() =>
-                        handleReviewAction(
-                          'REVIEWED',
-                        )
-                      }
+                      onClick={() => handleReviewAction('REVIEWED')}
                     >
-                      {reviewLoading
-                        ? 'Proses...'
-                        : 'Tandai Reviewed'}
+                      {reviewLoading ? 'Proses...' : 'Tandai Reviewed'}
                     </button>
                   )}
 
@@ -1383,15 +877,9 @@ function StockCountPage({
                       className="stock-review-button stock-approve-button"
                       type="button"
                       disabled={reviewLoading}
-                      onClick={() =>
-                        handleReviewAction(
-                          'APPROVED',
-                        )
-                      }
+                      onClick={() => handleReviewAction('APPROVED')}
                     >
-                      {reviewLoading
-                        ? 'Proses...'
-                        : 'Approve'}
+                      {reviewLoading ? 'Proses...' : 'Approve'}
                     </button>
                   )}
 
@@ -1399,33 +887,20 @@ function StockCountPage({
                     <button
                       className="stock-review-button stock-reject-button"
                       type="button"
-                      disabled={
-                        reviewLoading ||
-                        !reviewNotes.trim()
-                      }
-                      onClick={() =>
-                        handleReviewAction(
-                          'REJECTED',
-                        )
-                      }
+                      disabled={reviewLoading || !reviewNotes.trim()}
+                      onClick={() => handleReviewAction('REJECTED')}
                     >
-                      {reviewLoading
-                        ? 'Proses...'
-                        : 'Reject'}
+                      {reviewLoading ? 'Proses...' : 'Reject'}
                     </button>
                   )}
                 </div>
 
                 {error && (
-                  <div className="error-message">
-                    {error}
-                  </div>
+                  <div className="error-message">{error}</div>
                 )}
 
                 {successMessage && (
-                  <div className="success-message">
-                    {successMessage}
-                  </div>
+                  <div className="success-message">{successMessage}</div>
                 )}
               </div>
             </div>
@@ -1447,92 +922,48 @@ function StockCountPage({
                     <th>Waktu Input</th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  {selectedSession
-                    .items.length === 0 ? (
+                  {selectedSession.items.length === 0 ? (
                     <tr>
-                      <td
-                        className="stock-empty-table"
-                        colSpan="9"
-                      >
-                        Transaksi ini belum
-                        mempunyai detail item.
+                      <td className="stock-empty-table" colSpan="9">
+                        Transaksi ini belum mempunyai detail item.
                       </td>
                     </tr>
                   ) : (
-                    selectedSession.items.map(
-                      (item, index) => (
-                        <tr key={item.id}>
-                          <td>
-                            {index + 1}
-                          </td>
-
-                          <td>
-                            <span className="stock-bin-label">
-                              {item.binCode}
-                            </span>
-                          </td>
-
-                          <td>
-                            <strong>
-                              {item.skuCode}
-                            </strong>
-                          </td>
-
-                          <td>
-                            {item.skuName}
-                          </td>
-
-                          <td>
-                            {formatQty(
-                              item.systemQty,
-                            )}
-                          </td>
-
-                          <td>
-                            <strong>
-                              {formatQty(
-                                item.actualQty,
-                              )}
-                            </strong>
-                          </td>
-
-                          <td>
-                            <strong
-                              className={getVarianceClass(
-                                item.variance,
-                              )}
-                            >
-                              {item.variance > 0
-                                ? '+'
-                                : ''}
-
-                              {formatQty(
-                                item.variance,
-                              )}
-                            </strong>
-                          </td>
-
-                          <td>
-                            {item.notes}
-                          </td>
-
-                          <td>
-                            {formatDate(
-                              item.createdAt,
-                            )}
-                          </td>
-                        </tr>
-                      ),
-                    )
+                    selectedSession.items.map((item, index) => (
+                      <tr key={item.id}>
+                        <td>{index + 1}</td>
+                        <td>
+                          <span className="stock-bin-label">
+                            {item.binCode}
+                          </span>
+                        </td>
+                        <td>
+                          <strong>{item.skuCode}</strong>
+                        </td>
+                        <td>{item.skuName}</td>
+                        <td>{formatQty(item.systemQty)}</td>
+                        <td>
+                          <strong>{formatQty(item.actualQty)}</strong>
+                        </td>
+                        <td>
+                          <strong
+                            className={getVarianceClass(item.variance)}
+                          >
+                            {item.variance > 0 ? '+' : ''}
+                            {formatQty(item.variance)}
+                          </strong>
+                        </td>
+                        <td>{item.notes}</td>
+                        <td>{formatDate(item.createdAt)}</td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Confirmation Dialog */}
           {showConfirmDialog && (
             <div className="stock-confirm-dialog-overlay">
               <div className="stock-confirm-dialog">
@@ -1540,11 +971,9 @@ function StockCountPage({
 
                 <p>
                   Apakah Anda yakin ingin{' '}
-                  {confirmAction?.action ===
-                  'REVIEWED'
+                  {confirmAction?.action === 'REVIEWED'
                     ? 'menandai sebagai Reviewed'
-                    : confirmAction?.action ===
-                        'APPROVED'
+                    : confirmAction?.action === 'APPROVED'
                       ? 'Approve'
                       : 'Reject'}{' '}
                   transaksi ini?
@@ -1554,34 +983,24 @@ function StockCountPage({
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={() =>
-                      setShowConfirmDialog(
-                        false,
-                      )
-                    }
+                    onClick={() => setShowConfirmDialog(false)}
                   >
                     Batal
                   </button>
 
                   <button
                     className={`primary-button ${
-                      confirmAction?.action ===
-                      'REJECTED'
+                      confirmAction?.action === 'REJECTED'
                         ? 'stock-reject-button'
-                        : confirmAction?.action ===
-                            'APPROVED'
+                        : confirmAction?.action === 'APPROVED'
                           ? 'stock-approve-button'
                           : 'stock-reviewed-button'
                     }`}
                     type="button"
                     disabled={reviewLoading}
-                    onClick={
-                      executeReviewAction
-                    }
+                    onClick={executeReviewAction}
                   >
-                    {reviewLoading
-                      ? 'Proses...'
-                      : 'Ya, Lanjutkan'}
+                    {reviewLoading ? 'Proses...' : 'Ya, Lanjutkan'}
                   </button>
                 </div>
               </div>
@@ -1596,13 +1015,8 @@ function StockCountPage({
     <main className="dashboard-page">
       <header className="dashboard-header">
         <div>
-          <p className="small-label">
-            BCL Warehouse WMS
-          </p>
-
-          <h1>
-            Transaksi Stock Count
-          </h1>
+          <p className="small-label">BCL Warehouse WMS</p>
+          <h1>Transaksi Stock Count</h1>
         </div>
 
         <div className="stock-header-actions">
@@ -1620,9 +1034,7 @@ function StockCountPage({
             disabled={loadingLogout}
             onClick={onLogout}
           >
-            {loadingLogout
-              ? 'Keluar...'
-              : 'Logout'}
+            {loadingLogout ? 'Keluar...' : 'Logout'}
           </button>
         </div>
       </header>
@@ -1631,42 +1043,27 @@ function StockCountPage({
         <div className="stock-summary-grid stock-session-summary">
           <article className="stock-summary-card">
             <span>Total Transaksi</span>
-            <strong>
-              {sessions.length}
-            </strong>
+            <strong>{sessions.length}</strong>
           </article>
-
           <article className="stock-summary-card">
             <span>Total Staff</span>
-            <strong>
-              {totalStaff}
-            </strong>
+            <strong>{totalStaff}</strong>
           </article>
-
           <article className="stock-summary-card">
             <span>Total Baris Hitungan</span>
-            <strong>
-              {totalItems}
-            </strong>
+            <strong>{totalItems}</strong>
           </article>
-
           <article className="stock-summary-card">
             <span>Hasil Ditampilkan</span>
-            <strong>
-              {filteredSessions.length}
-            </strong>
+            <strong>{filteredSessions.length}</strong>
           </article>
         </div>
 
         <div className="stock-toolbar">
           <div>
-            <h2>
-              Daftar Nomor Transaksi
-            </h2>
-
+            <h2>Daftar Nomor Transaksi</h2>
             <p>
-              Klik nomor transaksi untuk
-              melihat seluruh detail hitungan.
+              Klik nomor transaksi untuk melihat seluruh detail hitungan.
             </p>
           </div>
 
@@ -1676,11 +1073,7 @@ function StockCountPage({
               type="search"
               value={search}
               placeholder="Cari transaksi, staff, atau status"
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSearch(event.target.value)}
             />
 
             <button
@@ -1689,19 +1082,14 @@ function StockCountPage({
               disabled={loading}
               onClick={loadData}
             >
-              {loading
-                ? 'Memuat...'
-                : 'Refresh'}
+              {loading ? 'Memuat...' : 'Refresh'}
             </button>
           </div>
         </div>
 
         {error && (
           <div className="error-message">
-            <strong>
-              Data gagal dimuat
-            </strong>
-
+            <strong>Data gagal dimuat</strong>
             <p>{error}</p>
           </div>
         )}
@@ -1721,114 +1109,67 @@ function StockCountPage({
                   <th>Aksi</th>
                 </tr>
               </thead>
-
               <tbody>
                 {loading ? (
                   <tr>
-                    <td
-                      className="stock-empty-table"
-                      colSpan="8"
-                    >
+                    <td className="stock-empty-table" colSpan="8">
                       Memuat transaksi Stock Count...
                     </td>
                   </tr>
-                ) : filteredSessions
-                    .length === 0 ? (
+                ) : filteredSessions.length === 0 ? (
                   <tr>
-                    <td
-                      className="stock-empty-table"
-                      colSpan="8"
-                    >
+                    <td className="stock-empty-table" colSpan="8">
                       Belum ada transaksi Stock Count.
                     </td>
                   </tr>
                 ) : (
-                  filteredSessions.map(
-                    (session) => (
-                      <tr key={session.id}>
-                        <td>
-                          {formatDate(
-                            session.createdAt,
-                          )}
-                        </td>
-
-                        <td>
-                          <button
-                            className="transaction-number-button"
-                            type="button"
-                            onClick={() =>
-                              setSelectedSessionId(
-                                session.id,
-                              )
-                            }
-                          >
-                            {
-                              session.transactionNumber
-                            }
-                          </button>
-                        </td>
-
-                        <td>
-                          <strong>
-                            {session.staffName}
-                          </strong>
-                        </td>
-
-                        <td>
-                          {session.itemCount}
-                        </td>
-
-                        <td>
-                          <strong>
-                            {formatQty(
-                              session.totalActualQty,
-                            )}
-                          </strong>
-                        </td>
-
-                        <td>
-                          <strong
-                            className={getVarianceClass(
-                              session.totalVariance,
-                            )}
-                          >
-                            {session.totalVariance >
-                            0
-                              ? '+'
-                              : ''}
-
-                            {formatQty(
-                              session.totalVariance,
-                            )}
-                          </strong>
-                        </td>
-
-                        <td>
-                          <span
-                            className={`stock-status-label ${getStatusClass(
-                              session.status,
-                            )}`}
-                          >
-                            {session.status}
-                          </span>
-                        </td>
-
-                        <td>
-                          <button
-                            className="open-detail-button"
-                            type="button"
-                            onClick={() =>
-                              setSelectedSessionId(
-                                session.id,
-                              )
-                            }
-                          >
-                            Buka Detail
-                          </button>
-                        </td>
-                      </tr>
-                    ),
-                  )
+                  filteredSessions.map((session) => (
+                    <tr key={session.id}>
+                      <td>{formatDate(session.createdAt)}</td>
+                      <td>
+                        <button
+                          className="transaction-number-button"
+                          type="button"
+                          onClick={() => setSelectedSessionId(session.id)}
+                        >
+                          {session.transactionNumber}
+                        </button>
+                      </td>
+                      <td>
+                        <strong>{session.staffName}</strong>
+                      </td>
+                      <td>{session.itemCount}</td>
+                      <td>
+                        <strong>{formatQty(session.totalActualQty)}</strong>
+                      </td>
+                      <td>
+                        <strong
+                          className={getVarianceClass(session.totalVariance)}
+                        >
+                          {session.totalVariance > 0 ? '+' : ''}
+                          {formatQty(session.totalVariance)}
+                        </strong>
+                      </td>
+                      <td>
+                        <span
+                          className={`stock-status-label ${getStatusClass(
+                            session.status,
+                          )}`}
+                        >
+                          {session.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="open-detail-button"
+                          type="button"
+                          onClick={() => setSelectedSessionId(session.id)}
+                        >
+                          Buka Detail
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

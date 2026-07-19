@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { toInt, normalizeUpper } from '../lib/utils'
 import './MasterEkspedisiPage.css'
 
 const TABLE_RULES = 'courier_resi_rules'
@@ -17,16 +18,24 @@ const bodyTypeOptions = [
   { value: 'ALPHANUMERIC', label: 'ALPHANUMERIC (0-9 A-Z setelah prefix)' },
 ]
 
-function toInt(value, fallback = 0) {
-  const parsed = Number.parseInt(String(value ?? ''), 10)
-  return Number.isFinite(parsed) ? parsed : fallback
+const INITIAL_FORM = {
+  courier_code: '',
+  courier_name: '',
+  match_type: 'PREFIX',
+  prefix: '',
+  body_type: 'ANY',
+  min_length: 0,
+  max_length: 50,
+  priority: 0,
+  is_active: true,
 }
 
-function normalizeUpper(value) {
-  return String(value || '').trim().toUpperCase()
-}
-
-function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
+function MasterEkspedisiPage({
+  profile,
+  loadingLogout,
+  onBack,
+  onLogout,
+}) {
   const [rules, setRules] = useState([])
   const [loadingRules, setLoadingRules] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -35,36 +44,18 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
   const [version, setVersion] = useState('')
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState(null)
-
-  const [form, setForm] = useState({
-    courier_code: '',
-    courier_name: '',
-    match_type: 'PREFIX',
-    prefix: '',
-    body_type: 'ANY',
-    min_length: 0,
-    max_length: 50,
-    priority: 0,
-    is_active: true,
-  })
+  const [form, setForm] = useState(INITIAL_FORM)
 
   const resetForm = useCallback(() => {
     setEditingId(null)
-    setForm({
-      courier_code: '',
-      courier_name: '',
-      match_type: 'PREFIX',
-      prefix: '',
-      body_type: 'ANY',
-      min_length: 0,
-      max_length: 50,
-      priority: 0,
-      is_active: true,
-    })
+    setForm(INITIAL_FORM)
   }, [])
 
   const loadVersion = useCallback(async () => {
-    if (!supabase) return
+    if (!supabase) {
+      return
+    }
+
     const { data, error: settingsError } = await supabase
       .from(TABLE_SETTINGS)
       .select('key, value')
@@ -72,10 +63,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
       .maybeSingle()
 
     if (settingsError) {
-      // tidak fatal
       console.warn('Gagal load version settings:', settingsError)
       return
     }
+
     setVersion(data?.value ?? '')
   }, [])
 
@@ -89,6 +80,7 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
 
     setLoadingRules(true)
     setError('')
+
     try {
       const { data, error: rulesError } = await supabase
         .from(TABLE_RULES)
@@ -97,13 +89,16 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
         .order('priority', { ascending: false })
         .order('prefix', { ascending: true })
 
-      if (rulesError) throw rulesError
+      if (rulesError) {
+        throw rulesError
+      }
+
       setRules(data ?? [])
       await loadVersion()
     } catch (loadError) {
       console.error('Gagal memuat rules:', loadError)
       setError(
-        'Gagal memuat Master Ekspedisi. Pastikan tabel Supabase sudah dibuat dan RLS/policy benar.'
+        'Gagal memuat Master Ekspedisi. Pastikan tabel Supabase sudah dibuat dan RLS/policy benar.',
       )
       setRules([])
     } finally {
@@ -116,18 +111,26 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
   }, [loadRules])
 
   useEffect(() => {
-    if (!success) return undefined
+    if (!success) {
+      return undefined
+    }
+
     const t = window.setTimeout(() => setSuccess(''), 3500)
     return () => window.clearTimeout(t)
   }, [success])
 
   const filteredRules = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rules
+
+    if (!q) {
+      return rules
+    }
+
     return rules.filter((r) => {
       const courierCode = String(r.courier_code || '').toLowerCase()
       const courierName = String(r.courier_name || '').toLowerCase()
       const prefix = String(r.prefix || '').toLowerCase()
+
       return (
         courierCode.includes(q) ||
         courierName.includes(q) ||
@@ -158,23 +161,41 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
     const courier_name = String(form.courier_name || '').trim()
     const prefix = normalizeUpper(form.prefix)
 
-    if (!courier_code) return 'Courier Code wajib diisi.'
-    if (!courier_name) return 'Courier Name wajib diisi.'
-    if (!prefix) return 'Prefix wajib diisi.'
+    if (!courier_code) {
+      return 'Courier Code wajib diisi.'
+    }
+
+    if (!courier_name) {
+      return 'Courier Name wajib diisi.'
+    }
+
+    if (!prefix) {
+      return 'Prefix wajib diisi.'
+    }
 
     const minLen = toInt(form.min_length, 0)
     const maxLen = toInt(form.max_length, 0)
-    if (minLen < 0) return 'Min length tidak boleh negatif.'
-    if (maxLen < minLen) return 'Max length harus >= min length.'
+
+    if (minLen < 0) {
+      return 'Min length tidak boleh negatif.'
+    }
+
+    if (maxLen < minLen) {
+      return 'Max length harus >= min length.'
+    }
 
     return ''
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!supabase) return
+
+    if (!supabase) {
+      return
+    }
 
     const validation = validateForm()
+
     if (validation) {
       setError(validation)
       return
@@ -203,14 +224,20 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
           .update(payload)
           .eq('id', editingId)
 
-        if (updateError) throw updateError
+        if (updateError) {
+          throw updateError
+        }
+
         setSuccess('Rule berhasil diupdate.')
       } else {
         const { error: insertError } = await supabase
           .from(TABLE_RULES)
           .insert(payload)
 
-        if (insertError) throw insertError
+        if (insertError) {
+          throw insertError
+        }
+
         setSuccess('Rule berhasil ditambahkan.')
       }
 
@@ -219,7 +246,7 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
     } catch (saveError) {
       console.error('Gagal menyimpan rule:', saveError)
       setError(
-        'Gagal menyimpan rule. Cek apakah prefix sudah pernah dipakai, atau policy RLS admin belum benar.'
+        'Gagal menyimpan rule. Cek apakah prefix sudah pernah dipakai, atau policy RLS admin belum benar.',
       )
     } finally {
       setSaving(false)
@@ -227,16 +254,23 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
   }
 
   const toggleActive = async (rule) => {
-    if (!supabase) return
+    if (!supabase) {
+      return
+    }
+
     setError('')
     setSuccess('')
+
     try {
       const { error: updateError } = await supabase
         .from(TABLE_RULES)
         .update({ is_active: !(rule.is_active === true) })
         .eq('id', rule.id)
 
-      if (updateError) throw updateError
+      if (updateError) {
+        throw updateError
+      }
+
       setSuccess('Status rule berhasil diubah.')
       await loadRules()
     } catch (e) {
@@ -246,21 +280,31 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
   }
 
   const deleteRule = async (rule) => {
-    if (!supabase) return
+    if (!supabase) {
+      return
+    }
+
     const ok = window.confirm(
-      `Hapus rule ini?\n\nCourier: ${rule.courier_code}\nPrefix: ${rule.prefix}\n\nIni akan menghapus data permanen.`
+      `Hapus rule ini?\n\nCourier: ${rule.courier_code}\nPrefix: ${rule.prefix}\n\nIni akan menghapus data permanen.`,
     )
-    if (!ok) return
+
+    if (!ok) {
+      return
+    }
 
     setError('')
     setSuccess('')
+
     try {
       const { error: deleteError } = await supabase
         .from(TABLE_RULES)
         .delete()
         .eq('id', rule.id)
 
-      if (deleteError) throw deleteError
+      if (deleteError) {
+        throw deleteError
+      }
+
       setSuccess('Rule berhasil dihapus.')
       await loadRules()
     } catch (e) {
@@ -276,14 +320,20 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
           <p className="small-label">BCL Warehouse WMS</p>
           <h1>Master Ekspedisi</h1>
           <p className="master-expedisi-subtitle">
-            Kelola rule prefix/format resi untuk validasi handover (tanpa update APK).
+            Kelola rule prefix/format resi untuk validasi handover (tanpa
+            update APK).
           </p>
         </div>
 
         <div className="master-expedisi-actions">
-          <button className="secondary-button" type="button" onClick={onBack}>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onBack}
+          >
             Kembali
           </button>
+
           <button
             className="secondary-button"
             type="button"
@@ -292,6 +342,7 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
           >
             {loadingRules ? 'Memuat...' : 'Refresh'}
           </button>
+
           <button
             className="secondary-button"
             type="button"
@@ -307,8 +358,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
         <div className="master-expedisi-grid">
           <section className="master-expedisi-panel">
             <h2>{editingId ? 'Edit Rule' : 'Tambah Rule'}</h2>
+
             <p className="master-expedisi-small">
-              Admin aktif: <strong>{profile?.full_name || profile?.email || '-'}</strong>
+              Admin aktif:{' '}
+              <strong>{profile?.full_name || profile?.email || '-'}</strong>
               {version ? (
                 <>
                   <br />
@@ -324,7 +377,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
                   <input
                     value={form.courier_code}
                     onChange={(e) =>
-                      setForm((c) => ({ ...c, courier_code: e.target.value }))
+                      setForm((c) => ({
+                        ...c,
+                        courier_code: e.target.value,
+                      }))
                     }
                     placeholder="Contoh: SPX / JT / JNE / IDX"
                   />
@@ -334,7 +390,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
                   <input
                     value={form.courier_name}
                     onChange={(e) =>
-                      setForm((c) => ({ ...c, courier_name: e.target.value }))
+                      setForm((c) => ({
+                        ...c,
+                        courier_name: e.target.value,
+                      }))
                     }
                     placeholder="Contoh: Shopee Express"
                   />
@@ -420,7 +479,9 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
                 </div>
               </div>
 
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <label
+                style={{ display: 'flex', gap: 10, alignItems: 'center' }}
+              >
                 <input
                   type="checkbox"
                   checked={form.is_active === true}
@@ -432,7 +493,11 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
               </label>
 
               <div className="master-expedisi-form-actions">
-                <button className="primary-button" type="submit" disabled={saving}>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={saving}
+                >
                   {saving ? 'Menyimpan...' : editingId ? 'Update' : 'Tambah'}
                 </button>
                 <button
@@ -445,7 +510,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
                 </button>
               </div>
 
-              {error ? <div className="error-message">{error}</div> : null}
+              {error ? (
+                <div className="error-message">{error}</div>
+              ) : null}
+
               {success ? (
                 <div
                   className="error-message"
@@ -549,7 +617,10 @@ function MasterEkspedisiPage({ profile, loadingLogout, onBack, onLogout }) {
                   ))}
                   {!filteredRules.length ? (
                     <tr>
-                      <td colSpan={8} style={{ color: '#6f788c', padding: 18 }}>
+                      <td
+                        colSpan={8}
+                        style={{ color: '#6f788c', padding: 18 }}
+                      >
                         Tidak ada data.
                       </td>
                     </tr>

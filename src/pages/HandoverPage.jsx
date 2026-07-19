@@ -9,56 +9,15 @@ import {
   writeFileXLSX,
 } from 'xlsx'
 import { supabase } from '../lib/supabase'
+import { useCurrentUser } from '../lib/useCurrentUser'
+import {
+  formatDateLong,
+  getWitaDateKey,
+  pickValue,
+  safeFilename,
+  toNumber,
+} from '../lib/utils'
 import './HandoverPage.css'
-
-function pickValue(row, keys, fallback = '') {
-  if (!row) {
-    return fallback
-  }
-
-  for (const key of keys) {
-    const value = row[key]
-
-    if (
-      value !== undefined &&
-      value !== null &&
-      value !== ''
-    ) {
-      return value
-    }
-  }
-
-  return fallback
-}
-
-function toNumber(value) {
-  const parsed = Number(value)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
-
-function safeFilename(value) {
-  return String(value || 'Handover')
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, '_')
-}
-
-function formatTime(value, fallback = '-') {
-  if (!value) {
-    return fallback
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return fallback
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-    timeZone: 'Asia/Makassar',
-  }).format(date)
-}
 
 function getStatusLabel(status) {
   const normalized = String(status || '')
@@ -160,27 +119,6 @@ function getGroupOperationalDate(group) {
   return group.submitted_at || group.created_at
 }
 
-function getWitaDateKey(isoValue) {
-  if (!isoValue) {
-    return null
-  }
-
-  const timestamp = new Date(isoValue).getTime()
-
-  if (Number.isNaN(timestamp)) {
-    return null
-  }
-
-  const WITA_OFFSET_MS = 8 * 60 * 60 * 1000
-  const witaDate = new Date(timestamp + WITA_OFFSET_MS)
-
-  return [
-    witaDate.getUTCFullYear(),
-    String(witaDate.getUTCMonth() + 1).padStart(2, '0'),
-    String(witaDate.getUTCDate()).padStart(2, '0'),
-  ].join('-')
-}
-
 function HandoverPage({
   session,
   loadingLogout,
@@ -204,13 +142,10 @@ function HandoverPage({
   const [previewImage, setPreviewImage] = useState(null)
   const [photoLoadError, setPhotoLoadError] = useState(false)
   const [signatureLoadError, setSignatureLoadError] = useState(false)
-  const [cancelTarget, setCancelTarget] =
-    useState(null)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [cancellingItemId, setCancellingItemId] = useState(null)
 
-  const [
-    cancellingItemId,
-    setCancellingItemId,
-  ] = useState(null)
+  const { getCurrentUserName } = useCurrentUser(session)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -285,6 +220,7 @@ function HandoverPage({
       )
 
       const itemsByGroupId = new Map()
+
       ;(itemsResult.data ?? []).forEach((item) => {
         const groupId = String(
           pickValue(item, ['handover_group_id'], ''),
@@ -302,6 +238,7 @@ function HandoverPage({
       })
 
       const eventMap = new Map()
+
       ;(eventGroupsResult.data ?? []).forEach((relation) => {
         const groupId = String(
           pickValue(relation, ['handover_group_id'], ''),
@@ -381,7 +318,9 @@ function HandoverPage({
       filters.endDate &&
       filters.startDate > filters.endDate
     ) {
-      setDateValidationError('Tanggal mulai tidak boleh melewati tanggal akhir.')
+      setDateValidationError(
+        'Tanggal mulai tidak boleh melewati tanggal akhir.',
+      )
     } else {
       setDateValidationError('')
     }
@@ -391,7 +330,7 @@ function HandoverPage({
     const courierNames = new Set(
       groups
         .map((group) => group.courierName)
-        .filter(Boolean),
+        .filter((name) => name && name !== '-'),
     )
 
     return Array.from(courierNames).sort((left, right) =>
@@ -402,16 +341,14 @@ function HandoverPage({
   const filteredGroups = useMemo(() => {
     const searchText = search.trim().toLowerCase()
 
-    return groups.filter((group, index) => {
-      const courierName = String(group.courierName || '')
-        .toLowerCase()
-      const groupNumber = String(group.group_number || '')
-        .toLowerCase()
-      const createdBy = String(group.created_by_name || '')
-        .toLowerCase()
+    return groups.filter((group) => {
+      const courierName = String(group.courierName || '').toLowerCase()
+      const groupNumber = String(group.group_number || '').toLowerCase()
+      const createdBy = String(group.created_by_name || '').toLowerCase()
       const staffName = String(
         group.handed_over_by_name || group.created_by_name || '',
       ).toLowerCase()
+
       const trackingMatches = (group.items || []).some((item) => {
         const trackingNumber = String(
           item.tracking_number || '',
@@ -438,23 +375,18 @@ function HandoverPage({
       const operationalDateKey = getWitaDateKey(operationalDate)
 
       const matchesStartDate =
-        !filters.startDate || operationalDateKey >= filters.startDate
+        !filters.startDate ||
+        (operationalDateKey &&
+          operationalDateKey >= filters.startDate)
+
       const matchesEndDate =
-        !filters.endDate || operationalDateKey <= filters.endDate
+        !filters.endDate ||
+        (operationalDateKey &&
+          operationalDateKey <= filters.endDate)
 
-      const matchesDate = matchesStartDate && matchesEndDate
-
-      // Debug untuk 2 data pertama
-      if (index < 2 && (filters.startDate || filters.endDate)) {
-        console.debug('Handover date filter', {
-          groupNumber: group.group_number,
-          sourceDate: operationalDate,
-          operationalDateKey,
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          matchesDate,
-        })
-      }
+      const matchesDate =
+        matchesStartDate &&
+        matchesEndDate
 
       const matchesCourier =
         !filters.courier ||
@@ -485,6 +417,14 @@ function HandoverPage({
     )
   }, [groups, selectedGroupId])
 
+  useEffect(() => {
+    setPhotoLoadError(false)
+    setSignatureLoadError(false)
+  }, [
+    selectedGroup?.event?.courier_photo_path,
+    selectedGroup?.event?.signature_path,
+  ])
+
   const filteredItems = useMemo(() => {
     if (!selectedGroup) {
       return []
@@ -514,7 +454,8 @@ function HandoverPage({
   const summaryValues = useMemo(() => {
     const totalGroups = filteredGroups.length
     const readyCount = filteredGroups.filter(
-      (group) => getStatusKey(group.status) === 'READY_FOR_HANDOVER',
+      (group) =>
+        getStatusKey(group.status) === 'READY_FOR_HANDOVER',
     ).length
     const deliveredCount = filteredGroups.filter(
       (group) => getStatusKey(group.status) === 'TERKIRIM',
@@ -532,6 +473,46 @@ function HandoverPage({
       totalPackages,
     }
   }, [filteredGroups])
+
+  const courierPhotoUrl = useMemo(() => {
+    const path = selectedGroup?.event?.courier_photo_path
+
+    if (!path || !supabase) {
+      return ''
+    }
+
+    const { data } = supabase.storage
+      .from('handover-proofs')
+      .getPublicUrl(path)
+
+    return data?.publicUrl || ''
+  }, [selectedGroup?.event?.courier_photo_path])
+
+  const signatureUrl = useMemo(() => {
+    const path = selectedGroup?.event?.signature_path
+
+    if (!path || !supabase) {
+      return ''
+    }
+
+    const { data } = supabase.storage
+      .from('handover-proofs')
+      .getPublicUrl(path)
+
+    return data?.publicUrl || ''
+  }, [selectedGroup?.event?.signature_path])
+
+  const previewImageUrl = useMemo(() => {
+    if (!previewImage || !supabase) {
+      return ''
+    }
+
+    const { data } = supabase.storage
+      .from('handover-proofs')
+      .getPublicUrl(previewImage)
+
+    return data?.publicUrl || ''
+  }, [previewImage])
 
   const handleRefresh = () => {
     loadData()
@@ -551,42 +532,6 @@ function HandoverPage({
     }
   }
 
-  const getCurrentUserName = async () => {
-    const fallbackName =
-      session?.user?.user_metadata?.full_name ||
-      session?.user?.user_metadata?.name ||
-      session?.user?.email ||
-      'User WMS'
-
-    if (!session?.user?.id) {
-      return fallbackName
-    }
-
-    const {
-      data: profile,
-      error: profileError,
-    } = await supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('id', session.user.id)
-      .maybeSingle()
-
-    if (profileError) {
-      console.error(
-        'Gagal membaca nama user:',
-        profileError,
-      )
-
-      return fallbackName
-    }
-
-    return (
-      profile?.full_name ||
-      profile?.email ||
-      fallbackName
-    )
-  }
-
   const handleMarkCancelled = async () => {
     const target = cancelTarget
 
@@ -599,8 +544,7 @@ function HandoverPage({
     setCancellingItemId(itemId)
 
     try {
-      const userName =
-        await getCurrentUserName()
+      const userName = await getCurrentUserName()
 
       const {
         data,
@@ -629,36 +573,28 @@ function HandoverPage({
 
       setGroups((currentGroups) =>
         currentGroups.map((group) => {
-          if (
-            String(group.id) !==
-            String(target.groupId)
-          ) {
+          if (String(group.id) !== String(target.groupId)) {
             return group
           }
 
           return {
             ...group,
-            items: (group.items || []).map(
-              (item) =>
-                String(item.id) === itemId
-                  ? {
-                      ...item,
-                      is_cancelled: true,
-                      cancelled_at:
-                        cancelledAt,
-                      cancelled_by_name:
-                        cancelledByName,
-                    }
-                  : item,
+            items: (group.items || []).map((item) =>
+              String(item.id) === itemId
+                ? {
+                    ...item,
+                    is_cancelled: true,
+                    cancelled_at: cancelledAt,
+                    cancelled_by_name: cancelledByName,
+                  }
+                : item,
             ),
           }
         }),
       )
 
       setCancelTarget(null)
-      setToast(
-        'Order berhasil ditandai cancel.',
-      )
+      setToast('Order berhasil ditandai cancel.')
     } catch (cancelError) {
       console.error(
         'Gagal menandai order cancel:',
@@ -684,12 +620,16 @@ function HandoverPage({
       Duplicate: group.duplicate_count || 0,
       'Ditambahkan Manual': group.unverified_count || 0,
       'Dibuat Oleh': group.created_by_name || '-',
-      'Waktu Submit': formatTime(
+      'Waktu Submit': formatDateLong(
         group.submitted_at || group.created_at,
       ),
-      'Nama Kurir': group.event?.courier_name || group.courierName || '-',
-      'Dikirim Oleh': group.event?.handed_over_by_name || group.handed_over_by_name || '-',
-      'Waktu Dikirim': formatTime(
+      'Nama Kurir':
+        group.event?.courier_name || group.courierName || '-',
+      'Dikirim Oleh':
+        group.event?.handed_over_by_name ||
+        group.handed_over_by_name ||
+        '-',
+      'Waktu Dikirim': formatDateLong(
         group.event?.handed_over_at || group.handed_over_at,
       ),
       'Nomor Event': group.event?.event_number || '-',
@@ -705,22 +645,38 @@ function HandoverPage({
         'Status Validasi': getVerificationLabel(
           item.verification_status,
         ),
-        Duplicate: item.duplicate_override ? 'Duplicate Diizinkan' : '-',
+        Duplicate: item.duplicate_override
+          ? 'Duplicate Diizinkan'
+          : '-',
         'Alasan Override': item.override_reason || '-',
         'Staff Scan': item.scanned_by_name || '-',
-        'Waktu Scan': formatTime(item.scanned_at),
-        'Nama Kurir': group.event?.courier_name || group.courierName || '-',
+        'Waktu Scan': formatDateLong(item.scanned_at),
+        'Nama Kurir':
+          group.event?.courier_name || group.courierName || '-',
         'Nomor Event': group.event?.event_number || '-',
       })),
     )
 
     const summarySheet = utils.json_to_sheet(summaryRows)
     const detailSheet = utils.json_to_sheet(detailRows)
-    utils.book_append_sheet(workbook, summarySheet, 'Summary Handover')
-    utils.book_append_sheet(workbook, detailSheet, 'Detail Resi')
+
+    utils.book_append_sheet(
+      workbook,
+      summarySheet,
+      'Summary Handover',
+    )
+    utils.book_append_sheet(
+      workbook,
+      detailSheet,
+      'Detail Resi',
+    )
 
     const stamp = new Date()
-    const fileName = `Handover_${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}_${String(stamp.getHours()).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}.xlsx`
+    const fileName = `Handover_${stamp.getFullYear()}${String(
+      stamp.getMonth() + 1,
+    ).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}_${String(
+      stamp.getHours(),
+    ).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}.xlsx`
 
     writeFileXLSX(workbook, fileName)
     setToast('File Excel berhasil diunduh.')
@@ -732,23 +688,32 @@ function HandoverPage({
     }
 
     const workbook = utils.book_new()
+
     const groupSummaryRows = [
       {
         'Nomor Group': selectedGroup.group_number || '-',
         Ekspedisi: selectedGroup.courierName || '-',
         Status: getStatusLabel(selectedGroup.status),
-        'Total Paket': selectedGroup.package_count || selectedGroup.items?.length || 0,
+        'Total Paket':
+          selectedGroup.package_count || selectedGroup.items?.length || 0,
         Duplicate: selectedGroup.duplicate_count || 0,
         'Ditambahkan Manual': selectedGroup.unverified_count || 0,
         'Dibuat Oleh': selectedGroup.created_by_name || '-',
-        'Waktu Submit': formatTime(
+        'Waktu Submit': formatDateLong(
           selectedGroup.submitted_at || selectedGroup.created_at,
         ),
-        'Dikirim Oleh': selectedGroup.event?.handed_over_by_name || selectedGroup.handed_over_by_name || '-',
-        'Waktu Dikirim': formatTime(
-          selectedGroup.event?.handed_over_at || selectedGroup.handed_over_at,
+        'Dikirim Oleh':
+          selectedGroup.event?.handed_over_by_name ||
+          selectedGroup.handed_over_by_name ||
+          '-',
+        'Waktu Dikirim': formatDateLong(
+          selectedGroup.event?.handed_over_at ||
+            selectedGroup.handed_over_at,
         ),
-        'Nama Kurir': selectedGroup.event?.courier_name || selectedGroup.courierName || '-',
+        'Nama Kurir':
+          selectedGroup.event?.courier_name ||
+          selectedGroup.courierName ||
+          '-',
         'Nomor Event': selectedGroup.event?.event_number || '-',
       },
     ]
@@ -756,36 +721,57 @@ function HandoverPage({
     const itemsRows = (selectedGroup.items || []).map((item, index) => ({
       No: index + 1,
       'Nomor Resi': item.tracking_number || '-',
-      'Status Validasi': getVerificationLabel(item.verification_status),
-      Duplicate: item.duplicate_override ? 'Duplicate Diizinkan' : '-',
+      'Status Validasi': getVerificationLabel(
+        item.verification_status,
+      ),
+      Duplicate: item.duplicate_override
+        ? 'Duplicate Diizinkan'
+        : '-',
       'Alasan Override': item.override_reason || '-',
       'Staff Scan': item.scanned_by_name || '-',
-      'Waktu Scan': formatTime(item.scanned_at),
+      'Waktu Scan': formatDateLong(item.scanned_at),
       Catatan: item.notes || '-',
     }))
 
     const proofRows = [
       {
         'Nomor Event': selectedGroup.event?.event_number || '-',
-        'Nama Kurir': selectedGroup.event?.courier_name || selectedGroup.courierName || '-',
-        'Dikirim Oleh': selectedGroup.event?.handed_over_by_name || selectedGroup.handed_over_by_name || '-',
-        'Tanggal dan Jam': formatTime(
-          selectedGroup.event?.handed_over_at || selectedGroup.handed_over_at,
+        'Nama Kurir':
+          selectedGroup.event?.courier_name ||
+          selectedGroup.courierName ||
+          '-',
+        'Dikirim Oleh':
+          selectedGroup.event?.handed_over_by_name ||
+          selectedGroup.handed_over_by_name ||
+          '-',
+        'Tanggal dan Jam': formatDateLong(
+          selectedGroup.event?.handed_over_at ||
+            selectedGroup.handed_over_at,
         ),
-        'Path Foto Kurir': selectedGroup.event?.courier_photo_path || '-',
-        'Path Tanda Tangan': selectedGroup.event?.signature_path || '-',
-        Catatan: selectedGroup.event?.proof_notes || selectedGroup.event?.notes || '-',
+        'Path Foto Kurir':
+          selectedGroup.event?.courier_photo_path || '-',
+        'Path Tanda Tangan':
+          selectedGroup.event?.signature_path || '-',
+        Catatan:
+          selectedGroup.event?.proof_notes ||
+          selectedGroup.event?.notes ||
+          '-',
       },
     ]
 
     const summarySheet = utils.json_to_sheet(groupSummaryRows)
     const itemsSheet = utils.json_to_sheet(itemsRows)
     const proofSheet = utils.json_to_sheet(proofRows)
+
     utils.book_append_sheet(workbook, summarySheet, 'Group Summary')
     utils.book_append_sheet(workbook, itemsSheet, 'Daftar Resi')
     utils.book_append_sheet(workbook, proofSheet, 'Bukti Handover')
 
-    const fileName = `${safeFilename(selectedGroup.group_number || 'group')}.xlsx`
+    const fileName = `${safeFilename(
+      selectedGroup.group_number || 'group',
+      'group',
+    )}.xlsx`
+
     writeFileXLSX(workbook, fileName)
     setToast('File Excel detail berhasil diunduh.')
   }
@@ -841,7 +827,11 @@ function HandoverPage({
             className="handover-action-button handover-action-button--primary"
             type="button"
             onClick={handleDownloadListExcel}
-            disabled={loading || filteredGroups.length === 0 || Boolean(dateValidationError)}
+            disabled={
+              loading ||
+              filteredGroups.length === 0 ||
+              Boolean(dateValidationError)
+            }
           >
             Download Excel
           </button>
@@ -961,14 +951,19 @@ function HandoverPage({
           </div>
 
           {dateValidationError ? (
-            <div className="handover-error-message" style={{ marginBottom: '1rem', color: '#e74c3c' }}>
+            <div
+              className="handover-error-message"
+              style={{ marginBottom: '1rem', color: '#e74c3c' }}
+            >
               <p>{dateValidationError}</p>
             </div>
           ) : null}
 
           <div className="handover-search-row">
             <label className="handover-input-group handover-search-group">
-              <span>Cari nomor group, resi, ekspedisi, staff, atau kurir</span>
+              <span>
+                Cari nomor group, resi, ekspedisi, staff, atau kurir
+              </span>
               <input
                 type="search"
                 value={search}
@@ -1047,28 +1042,40 @@ function HandoverPage({
                         <button
                           className="handover-link-button"
                           type="button"
-                          onClick={() => setSelectedGroupId(String(group.id))}
+                          onClick={() =>
+                            setSelectedGroupId(String(group.id))
+                          }
                         >
                           {group.group_number || '-'}
                         </button>
                       </td>
-                      <td>{formatTime(group.submitted_at || group.created_at)}</td>
+                      <td>
+                        {formatDateLong(group.submitted_at || group.created_at)}
+                      </td>
                       <td>{group.courierName || '-'}</td>
                       <td>{group.package_count || group.items?.length || 0}</td>
                       <td>{group.duplicate_count || 0}</td>
                       <td>{group.unverified_count || 0}</td>
                       <td>{group.created_by_name || '-'}</td>
                       <td>
-                        <span className={`handover-status-badge ${getStatusClass(group.status)}`}>
+                        <span
+                          className={`handover-status-badge ${getStatusClass(group.status)}`}
+                        >
                           {getStatusLabel(group.status)}
                         </span>
                       </td>
-                      <td>{formatTime(group.event?.handed_over_at || group.handed_over_at)}</td>
+                      <td>
+                        {formatDateLong(
+                          group.event?.handed_over_at || group.handed_over_at,
+                        )}
+                      </td>
                       <td>
                         <button
                           className="secondary-button"
                           type="button"
-                          onClick={() => setSelectedGroupId(String(group.id))}
+                          onClick={() =>
+                            setSelectedGroupId(String(group.id))
+                          }
                         >
                           Detail
                         </button>
@@ -1086,26 +1093,51 @@ function HandoverPage({
                     <button
                       className="handover-link-button"
                       type="button"
-                      onClick={() => setSelectedGroupId(String(group.id))}
+                      onClick={() =>
+                        setSelectedGroupId(String(group.id))
+                      }
                     >
                       {group.group_number || '-'}
                     </button>
-                    <span className={`handover-status-badge ${getStatusClass(group.status)}`}>
+                    <span
+                      className={`handover-status-badge ${getStatusClass(group.status)}`}
+                    >
                       {getStatusLabel(group.status)}
                     </span>
                   </div>
 
-                  <p><strong>Tanggal Submit:</strong> {formatTime(group.submitted_at || group.created_at)}</p>
-                  <p><strong>Ekspedisi:</strong> {group.courierName || '-'}</p>
-                  <p><strong>Total Paket:</strong> {group.package_count || group.items?.length || 0}</p>
-                  <p><strong>Duplicate:</strong> {group.duplicate_count || 0}</p>
-                  <p><strong>Manual:</strong> {group.unverified_count || 0}</p>
-                  <p><strong>Dibuat Oleh:</strong> {group.created_by_name || '-'}</p>
-                  <p><strong>Waktu Terkirim:</strong> {formatTime(group.event?.handed_over_at || group.handed_over_at)}</p>
+                  <p>
+                    <strong>Tanggal Submit:</strong>{' '}
+                    {formatDateLong(group.submitted_at || group.created_at)}
+                  </p>
+                  <p>
+                    <strong>Ekspedisi:</strong> {group.courierName || '-'}
+                  </p>
+                  <p>
+                    <strong>Total Paket:</strong>{' '}
+                    {group.package_count || group.items?.length || 0}
+                  </p>
+                  <p>
+                    <strong>Duplicate:</strong> {group.duplicate_count || 0}
+                  </p>
+                  <p>
+                    <strong>Manual:</strong> {group.unverified_count || 0}
+                  </p>
+                  <p>
+                    <strong>Dibuat Oleh:</strong> {group.created_by_name || '-'}
+                  </p>
+                  <p>
+                    <strong>Waktu Terkirim:</strong>{' '}
+                    {formatDateLong(
+                      group.event?.handed_over_at || group.handed_over_at,
+                    )}
+                  </p>
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={() => setSelectedGroupId(String(group.id))}
+                    onClick={() =>
+                      setSelectedGroupId(String(group.id))
+                    }
                   >
                     Detail
                   </button>
@@ -1181,6 +1213,15 @@ function HandoverPage({
             >
               Download Excel
             </button>
+
+            <button
+              className="handover-action-button handover-action-button--secondary"
+              type="button"
+              disabled={loadingLogout}
+              onClick={onLogout}
+            >
+              {loadingLogout ? 'Keluar...' : 'Logout'}
+            </button>
           </div>
         </header>
 
@@ -1196,13 +1237,17 @@ function HandoverPage({
             </div>
             <div className="handover-detail-card">
               <p className="handover-detail-label">Status</p>
-              <strong className={`handover-status-badge ${getStatusClass(selectedGroup.status)}`}>
+              <strong
+                className={`handover-status-badge ${getStatusClass(selectedGroup.status)}`}
+              >
                 {getStatusLabel(selectedGroup.status)}
               </strong>
             </div>
             <div className="handover-detail-card">
               <p className="handover-detail-label">Total Paket</p>
-              <strong>{selectedGroup.package_count || selectedGroup.items?.length || 0}</strong>
+              <strong>
+                {selectedGroup.package_count || selectedGroup.items?.length || 0}
+              </strong>
             </div>
             <div className="handover-detail-card">
               <p className="handover-detail-label">Duplicate</p>
@@ -1218,7 +1263,11 @@ function HandoverPage({
             </div>
             <div className="handover-detail-card">
               <p className="handover-detail-label">Waktu Submit</p>
-              <strong>{formatTime(selectedGroup.submitted_at || selectedGroup.created_at)}</strong>
+              <strong>
+                {formatDateLong(
+                  selectedGroup.submitted_at || selectedGroup.created_at,
+                )}
+              </strong>
             </div>
           </div>
 
@@ -1227,15 +1276,28 @@ function HandoverPage({
               <div className="handover-delivery-grid">
                 <div>
                   <p className="handover-detail-label">Dikirim Oleh</p>
-                  <strong>{selectedGroup.event?.handed_over_by_name || selectedGroup.handed_over_by_name || '-'}</strong>
+                  <strong>
+                    {selectedGroup.event?.handed_over_by_name ||
+                      selectedGroup.handed_over_by_name ||
+                      '-'}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Waktu Dikirim</p>
-                  <strong>{formatTime(selectedGroup.event?.handed_over_at || selectedGroup.handed_over_at)}</strong>
+                  <strong>
+                    {formatDateLong(
+                      selectedGroup.event?.handed_over_at ||
+                        selectedGroup.handed_over_at,
+                    )}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Nama Kurir</p>
-                  <strong>{selectedGroup.event?.courier_name || selectedGroup.courierName || '-'}</strong>
+                  <strong>
+                    {selectedGroup.event?.courier_name ||
+                      selectedGroup.courierName ||
+                      '-'}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Nomor Event</p>
@@ -1254,7 +1316,9 @@ function HandoverPage({
                   type="search"
                   value={detailSearch}
                   placeholder="Ketik nomor resi"
-                  onChange={(event) => setDetailSearch(event.target.value)}
+                  onChange={(event) =>
+                    setDetailSearch(event.target.value)
+                  }
                 />
               </label>
             </div>
@@ -1282,7 +1346,8 @@ function HandoverPage({
                         ? (() => {
                             const sourceGroup = groups.find(
                               (group) =>
-                                String(group.id) === String(item.duplicate_source_group_id),
+                                String(group.id) ===
+                                String(item.duplicate_source_group_id),
                             )
 
                             return sourceGroup?.group_number
@@ -1299,10 +1364,7 @@ function HandoverPage({
                             ? 'handover-cancelled-row'
                             : ''
                         }
-                        key={
-                          item.id ||
-                          `${selectedGroup.id}-${index}`
-                        }
+                        key={item.id || `${selectedGroup.id}-${index}`}
                       >
                         <td>{index + 1}</td>
                         <td>
@@ -1311,28 +1373,32 @@ function HandoverPage({
                             <button
                               className="secondary-button handover-copy-button"
                               type="button"
-                              onClick={() => handleCopyTracking(item.tracking_number)}
+                              onClick={() =>
+                                handleCopyTracking(item.tracking_number)
+                              }
                             >
                               Salin
                             </button>
                           </div>
                         </td>
                         <td>
-                          <span className={`handover-pill ${getVerificationClass(item.verification_status)}`}>
+                          <span
+                            className={`handover-pill ${getVerificationClass(item.verification_status)}`}
+                          >
                             {getVerificationLabel(item.verification_status)}
                           </span>
                         </td>
                         <td>
                           {item.duplicate_override ? (
                             <span className="handover-pill handover-pill-warning">
-                              Duplicate Diizinkan
+                              {duplicateNote}
                             </span>
                           ) : (
                             '-'
                           )}
                         </td>
                         <td>{item.scanned_by_name || '-'}</td>
-                        <td>{formatTime(item.scanned_at)}</td>
+                        <td>{formatDateLong(item.scanned_at)}</td>
                         <td>{item.override_reason || '-'}</td>
                         <td>{item.notes || '-'}</td>
 
@@ -1345,14 +1411,11 @@ function HandoverPage({
 
                               <small>
                                 Ditandai oleh:{' '}
-                                {item.cancelled_by_name ||
-                                  '-'}
+                                {item.cancelled_by_name || '-'}
                               </small>
 
                               <small>
-                                {formatTime(
-                                  item.cancelled_at,
-                                )}
+                                {formatDateLong(item.cancelled_at)}
                               </small>
                             </div>
                           ) : (
@@ -1368,19 +1431,16 @@ function HandoverPage({
                               className="handover-danger-outline-button"
                               type="button"
                               disabled={
-                                cancellingItemId ===
-                                String(item.id)
+                                cancellingItemId === String(item.id)
                               }
                               onClick={() =>
                                 setCancelTarget({
                                   item,
-                                  groupId:
-                                    selectedGroup.id,
+                                  groupId: selectedGroup.id,
                                 })
                               }
                             >
-                              {cancellingItemId ===
-                              String(item.id)
+                              {cancellingItemId === String(item.id)
                                 ? 'Memproses...'
                                 : 'Tandai Cancel'}
                             </button>
@@ -1402,7 +1462,8 @@ function HandoverPage({
                     ? (() => {
                         const sourceGroup = groups.find(
                           (group) =>
-                            String(group.id) === String(item.duplicate_source_group_id),
+                            String(group.id) ===
+                            String(item.duplicate_source_group_id),
                         )
 
                         return sourceGroup?.group_number
@@ -1419,27 +1480,42 @@ function HandoverPage({
                         ? 'handover-cancelled-row'
                         : ''
                     }`}
-                    key={
-                      item.id ||
-                      `${selectedGroup.id}-${index}`
-                    }
+                    key={item.id || `${selectedGroup.id}-${index}`}
                   >
                     <div className="handover-mobile-card-header">
                       <strong>{item.tracking_number || '-'}</strong>
                       <button
                         className="secondary-button handover-copy-button"
                         type="button"
-                        onClick={() => handleCopyTracking(item.tracking_number)}
+                        onClick={() =>
+                          handleCopyTracking(item.tracking_number)
+                        }
                       >
                         Salin
                       </button>
                     </div>
-                    <p><strong>Status Validasi:</strong> {getVerificationLabel(item.verification_status)}</p>
-                    <p><strong>Duplicate:</strong> {duplicateNote}</p>
-                    <p><strong>Staff Scan:</strong> {item.scanned_by_name || '-'}</p>
-                    <p><strong>Waktu Scan:</strong> {formatTime(item.scanned_at)}</p>
-                    <p><strong>Alasan Override:</strong> {item.override_reason || '-'}</p>
-                    <p><strong>Catatan:</strong> {item.notes || '-'}</p>
+                    <p>
+                      <strong>Status Validasi:</strong>{' '}
+                      {getVerificationLabel(item.verification_status)}
+                    </p>
+                    <p>
+                      <strong>Duplicate:</strong> {duplicateNote}
+                    </p>
+                    <p>
+                      <strong>Staff Scan:</strong>{' '}
+                      {item.scanned_by_name || '-'}
+                    </p>
+                    <p>
+                      <strong>Waktu Scan:</strong>{' '}
+                      {formatDateLong(item.scanned_at)}
+                    </p>
+                    <p>
+                      <strong>Alasan Override:</strong>{' '}
+                      {item.override_reason || '-'}
+                    </p>
+                    <p>
+                      <strong>Catatan:</strong> {item.notes || '-'}
+                    </p>
 
                     {item.is_cancelled ? (
                       <div className="handover-cancel-info">
@@ -1453,9 +1529,7 @@ function HandoverPage({
                         </small>
 
                         <small>
-                          {formatTime(
-                            item.cancelled_at,
-                          )}
+                          {formatDateLong(item.cancelled_at)}
                         </small>
                       </div>
                     ) : (
@@ -1463,19 +1537,16 @@ function HandoverPage({
                         className="handover-danger-outline-button"
                         type="button"
                         disabled={
-                          cancellingItemId ===
-                          String(item.id)
+                          cancellingItemId === String(item.id)
                         }
                         onClick={() =>
                           setCancelTarget({
                             item,
-                            groupId:
-                              selectedGroup.id,
+                            groupId: selectedGroup.id,
                           })
                         }
                       >
-                        {cancellingItemId ===
-                        String(item.id)
+                        {cancellingItemId === String(item.id)
                           ? 'Memproses...'
                           : 'Tandai Cancel'}
                       </button>
@@ -1491,11 +1562,13 @@ function HandoverPage({
               <h2>Bukti Serah Terima</h2>
             </div>
 
-            {getStatusKey(selectedGroup.status) === 'READY_FOR_HANDOVER' || !proofAvailable ? (
+            {getStatusKey(selectedGroup.status) === 'READY_FOR_HANDOVER' ||
+            !proofAvailable ? (
               <div className="handover-empty-card">
                 <p>Belum diserahkan kepada kurir.</p>
                 <p className="handover-muted-text">
-                  Foto dan tanda tangan akan tampil setelah proses handover selesai melalui aplikasi Android.
+                  Foto dan tanda tangan akan tampil setelah proses handover
+                  selesai melalui aplikasi Android.
                 </p>
               </div>
             ) : (
@@ -1506,35 +1579,45 @@ function HandoverPage({
                     <button
                       className="secondary-button"
                       type="button"
-                      onClick={() => setPreviewImage(selectedGroup.event?.courier_photo_path || null)}
+                      onClick={() =>
+                        setPreviewImage(
+                          selectedGroup.event?.courier_photo_path || null,
+                        )
+                      }
+                      disabled={!courierPhotoUrl}
                     >
                       Buka Foto
                     </button>
                   </div>
 
-                  {selectedGroup.event?.courier_photo_path ? (
+                  {courierPhotoUrl ? (
                     <>
                       <div className="handover-image-frame">
                         <img
-                          src={(() => {
-                            const { data } = supabase.storage.from('handover-proofs').getPublicUrl(selectedGroup.event.courier_photo_path)
-                            return data.publicUrl
-                          })()}
+                          src={courierPhotoUrl}
                           alt="Foto kurir"
                           className="handover-proof-image"
                           onError={() => setPhotoLoadError(true)}
                         />
                       </div>
                       {photoLoadError ? (
-                        <p className="handover-muted-text">Foto tidak dapat dimuat.</p>
+                        <p className="handover-muted-text">
+                          Foto tidak dapat dimuat.
+                        </p>
                       ) : null}
                     </>
                   ) : (
-                    <p className="handover-muted-text">Foto kurir belum tersedia.</p>
+                    <p className="handover-muted-text">
+                      Foto kurir belum tersedia.
+                    </p>
                   )}
 
                   <p className="handover-proof-timestamp">
-                    {formatTime(selectedGroup.event?.proof_captured_at || selectedGroup.event?.handed_over_at || selectedGroup.handed_over_at)}
+                    {formatDateLong(
+                      selectedGroup.event?.proof_captured_at ||
+                        selectedGroup.event?.handed_over_at ||
+                        selectedGroup.handed_over_at,
+                    )}
                   </p>
                 </article>
 
@@ -1543,24 +1626,25 @@ function HandoverPage({
                     <h3>Tanda Tangan Digital</h3>
                   </div>
 
-                  {selectedGroup.event?.signature_path ? (
+                  {signatureUrl ? (
                     <div className="handover-signature-frame">
                       <img
-                        src={(() => {
-                          const { data } = supabase.storage.from('handover-proofs').getPublicUrl(selectedGroup.event.signature_path)
-                          return data.publicUrl
-                        })()}
+                        src={signatureUrl}
                         alt="Tanda tangan digital"
                         className="handover-signature-image"
                         onError={() => setSignatureLoadError(true)}
                       />
                     </div>
                   ) : (
-                    <p className="handover-muted-text">Tanda tangan belum tersedia.</p>
+                    <p className="handover-muted-text">
+                      Tanda tangan belum tersedia.
+                    </p>
                   )}
 
                   {signatureLoadError ? (
-                    <p className="handover-muted-text">Tanda tangan tidak dapat dimuat.</p>
+                    <p className="handover-muted-text">
+                      Tanda tangan tidak dapat dimuat.
+                    </p>
                   ) : null}
                 </article>
               </div>
@@ -1574,31 +1658,47 @@ function HandoverPage({
                 </div>
                 <div>
                   <p className="handover-detail-label">Nama Kurir</p>
-                  <strong>{selectedGroup.event.courier_name || selectedGroup.courierName || '-'}</strong>
+                  <strong>
+                    {selectedGroup.event.courier_name ||
+                      selectedGroup.courierName ||
+                      '-'}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Ekspedisi</p>
-                  <strong>{selectedGroup.event.courier_name || selectedGroup.courierName || '-'}</strong>
+                  <strong>{selectedGroup.courierName || '-'}</strong>
                 </div>
                 <div>
-                  <p className="handover-detail-label">Total Group dalam Event</p>
+                  <p className="handover-detail-label">
+                    Total Group dalam Event
+                  </p>
                   <strong>{selectedGroup.event.total_groups || 0}</strong>
                 </div>
                 <div>
-                  <p className="handover-detail-label">Total Paket dalam Event</p>
+                  <p className="handover-detail-label">
+                    Total Paket dalam Event
+                  </p>
                   <strong>{selectedGroup.event.total_packages || 0}</strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Dikirim Oleh</p>
-                  <strong>{selectedGroup.event.handed_over_by_name || '-'}</strong>
+                  <strong>
+                    {selectedGroup.event.handed_over_by_name || '-'}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Tanggal dan Jam</p>
-                  <strong>{formatTime(selectedGroup.event.handed_over_at)}</strong>
+                  <strong>
+                    {formatDateLong(selectedGroup.event.handed_over_at)}
+                  </strong>
                 </div>
                 <div>
                   <p className="handover-detail-label">Catatan</p>
-                  <strong>{selectedGroup.event.notes || selectedGroup.event.proof_notes || '-'}</strong>
+                  <strong>
+                    {selectedGroup.event.notes ||
+                      selectedGroup.event.proof_notes ||
+                      '-'}
+                  </strong>
                 </div>
               </div>
             ) : null}
@@ -1631,24 +1731,18 @@ function HandoverPage({
             role="dialog"
             aria-modal="true"
             aria-labelledby="cancel-order-title"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="cancel-order-title">
-              Tandai Order Cancel
-            </h2>
+            <h2 id="cancel-order-title">Tandai Order Cancel</h2>
 
             <p>
-              Anda yakin ingin menandai order
-              ini sebagai cancel?
+              Anda yakin ingin menandai order ini sebagai cancel?
             </p>
 
             <div className="handover-confirm-reference">
               Nomor Resi:{' '}
               <strong>
-                {cancelTarget.item
-                  ?.tracking_number || '-'}
+                {cancelTarget.item?.tracking_number || '-'}
               </strong>
             </div>
 
@@ -1656,12 +1750,8 @@ function HandoverPage({
               <button
                 className="secondary-button"
                 type="button"
-                disabled={Boolean(
-                  cancellingItemId,
-                )}
-                onClick={() =>
-                  setCancelTarget(null)
-                }
+                disabled={Boolean(cancellingItemId)}
+                onClick={() => setCancelTarget(null)}
               >
                 Tidak
               </button>
@@ -1669,14 +1759,10 @@ function HandoverPage({
               <button
                 className="handover-danger-button"
                 type="button"
-                disabled={Boolean(
-                  cancellingItemId,
-                )}
+                disabled={Boolean(cancellingItemId)}
                 onClick={handleMarkCancelled}
               >
-                {cancellingItemId
-                  ? 'Memproses...'
-                  : 'Ya'}
+                {cancellingItemId ? 'Memproses...' : 'Ya'}
               </button>
             </div>
           </section>
@@ -1695,14 +1781,17 @@ function HandoverPage({
             aria-modal="true"
             onClick={(event) => event.stopPropagation()}
           >
-            <img
-              src={(() => {
-                const { data } = supabase.storage.from('handover-proofs').getPublicUrl(previewImage)
-                return data.publicUrl
-              })()}
-              alt="Preview foto kurir"
-              className="handover-modal-image"
-            />
+            {previewImageUrl ? (
+              <img
+                src={previewImageUrl}
+                alt="Preview foto kurir"
+                className="handover-modal-image"
+              />
+            ) : (
+              <div className="handover-empty-card">
+                <p>Preview gambar tidak tersedia.</p>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

@@ -18,42 +18,18 @@ import UserManagementPage from './pages/UserManagementPage'
 import MasterEkspedisiPage from './pages/MasterEkspedisiPage'
 
 function App() {
-  const [session, setSession] =
-    useState(null)
+  const [session, setSession] = useState(null)
+  const [initializing, setInitializing] = useState(true)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [profile, setProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
 
-  const [initializing, setInitializing] =
-    useState(true)
-
-  const [email, setEmail] =
-    useState('')
-
-  const [password, setPassword] =
-    useState('')
-
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false)
-
-  const [loading, setLoading] =
-    useState(false)
-
-  const [error, setError] =
-    useState('')
-
-  const [
-    currentPage,
-    setCurrentPage,
-  ] = useState('dashboard')
-
-  const [profile, setProfile] =
-    useState(null)
-
-  const [
-    profileLoading,
-    setProfileLoading,
-  ] = useState(false)
-
+  // ─── Restore session on mount ───────────────────────────────
   useEffect(() => {
     if (!supabase) {
       setInitializing(false)
@@ -64,11 +40,8 @@ function App() {
 
     const restoreSession = async () => {
       const {
-        data: {
-          session: currentSession,
-        },
-      } =
-        await supabase.auth.getSession()
+        data: { session: currentSession },
+      } = await supabase.auth.getSession()
 
       if (active) {
         setSession(currentSession)
@@ -80,21 +53,16 @@ function App() {
 
     const {
       data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, currentSession) => {
-          if (active) {
-            setSession(currentSession)
-            setInitializing(false)
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      if (active) {
+        setSession(currentSession)
+        setInitializing(false)
 
-            if (!currentSession) {
-              setCurrentPage(
-                'dashboard',
-              )
-            }
-          }
-        },
-      )
+        if (!currentSession) {
+          setCurrentPage('dashboard')
+        }
+      }
+    })
 
     return () => {
       active = false
@@ -102,28 +70,22 @@ function App() {
     }
   }, [])
 
+  // ─── Load profile setiap session berubah ────────────────────
   useEffect(() => {
     let active = true
 
     const loadProfile = async () => {
-      if (
-        !session?.user?.id ||
-        !supabase
-      ) {
+      if (!session?.user?.id || !supabase) {
         if (active) {
           setProfile(null)
           setProfileLoading(false)
         }
-
         return
       }
 
       setProfileLoading(true)
 
-      const {
-        data,
-        error: profileError,
-      } = await supabase
+      const { data, error: profileError } = await supabase
         .from('profiles')
         .select(`
           id,
@@ -141,11 +103,7 @@ function App() {
       }
 
       if (profileError) {
-        console.error(
-          'Gagal memuat profile:',
-          profileError,
-        )
-
+        console.error('Gagal memuat profile:', profileError)
         setProfile(null)
       } else {
         setProfile(data)
@@ -161,10 +119,17 @@ function App() {
     }
   }, [session])
 
+  // ─── Computed: apakah user adalah admin aktif ────────────────
   const isAdmin =
     profile?.role === 'admin' &&
     profile?.is_active === true
 
+  // ─── Computed: apakah user adalah admin atau admin_warehouse ─
+  const isAdminOrWarehouse =
+    (profile?.role === 'admin' || profile?.role === 'admin_warehouse') &&
+    profile?.is_active === true
+
+  // ─── Login ───────────────────────────────────────────────────
   const handleLogin = async (event) => {
     event.preventDefault()
 
@@ -174,35 +139,23 @@ function App() {
     }
 
     if (!password) {
-      setError(
-        'Password wajib diisi.',
-      )
+      setError('Password wajib diisi.')
       return
     }
 
     setLoading(true)
     setError('')
 
-    const { error: loginError } =
-      await supabase.auth
-        .signInWithPassword({
-          email: email.trim(),
-          password,
-        })
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
 
     if (loginError) {
-      const errorMessage =
-        loginError.message
-          .toLowerCase()
+      const errorMessage = loginError.message.toLowerCase()
 
-      if (
-        errorMessage.includes(
-          'invalid login credentials',
-        )
-      ) {
-        setError(
-          'Email atau password salah.',
-        )
+      if (errorMessage.includes('invalid login credentials')) {
+        setError('Email atau password salah.')
       } else {
         setError(loginError.message)
       }
@@ -211,12 +164,12 @@ function App() {
     setLoading(false)
   }
 
+  // ─── Logout ──────────────────────────────────────────────────
   const handleLogout = async () => {
     setLoading(true)
     setError('')
 
-    const { error: logoutError } =
-      await supabase.auth.signOut()
+    const { error: logoutError } = await supabase.auth.signOut()
 
     if (logoutError) {
       setError('Logout gagal.')
@@ -227,169 +180,124 @@ function App() {
     setLoading(false)
   }
 
+  // ─── Guard: Supabase belum dikonfigurasi ─────────────────────
   if (supabaseConfigError) {
     return (
       <main className="page-center">
         <section className="message-card">
-          <h1>
-            Konfigurasi Belum Lengkap
-          </h1>
-
-          <p>
-            {supabaseConfigError}
-          </p>
+          <h1>Konfigurasi Belum Lengkap</h1>
+          <p>{supabaseConfigError}</p>
         </section>
       </main>
     )
   }
 
+  // ─── Guard: Masih initializing ───────────────────────────────
   if (initializing) {
     return (
       <main className="page-center">
         <section className="message-card">
           <div className="spinner" />
-
-          <p>
-            Memuat BCL Warehouse WMS...
-          </p>
+          <p>Memuat BCL Warehouse WMS...</p>
         </section>
       </main>
     )
   }
 
+  // ─── Routing: Halaman setelah login ──────────────────────────
   if (session) {
-    if (
-      currentPage === 'bin-to-bin'
-    ) {
+    if (currentPage === 'bin-to-bin') {
       return (
         <BinToBinPage
           session={session}
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'dashboard',
-            )
-          }
+          onBack={() => setCurrentPage('dashboard')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage === 'stock-count'
-    ) {
+    if (currentPage === 'stock-count') {
       return (
         <StockCountPage
           session={session}
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'dashboard',
-            )
-          }
+          onBack={() => setCurrentPage('dashboard')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage ===
-      'scan-pack-history'
-    ) {
+    if (currentPage === 'scan-pack-history') {
       return (
         <ScanPackHistoryPage
           session={session}
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'scan-pack',
-            )
-          }
+          onBack={() => setCurrentPage('scan-pack')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage ===
-        'cancelled-shipments'
-    ) {
+    if (currentPage === 'cancelled-shipments') {
       return (
         <CancelledShipmentsPage
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'scan-pack',
-            )
-          }
+          onBack={() => setCurrentPage('scan-pack')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage === 'scan-pack'
-    ) {
+    if (currentPage === 'scan-pack') {
       return (
         <ScanPackPage
           session={session}
           loadingLogout={loading}
-          onOpenHistory={() =>
-            setCurrentPage(
-              'scan-pack-history',
-            )
-          }
-          onOpenCancelledShipments={() =>
-            setCurrentPage(
-              'cancelled-shipments',
-            )
-          }
-          onBack={() =>
-            setCurrentPage(
-              'dashboard',
-            )
-          }
+          onOpenHistory={() => setCurrentPage('scan-pack-history')}
+          onOpenCancelledShipments={() => setCurrentPage('cancelled-shipments')}
+          onBack={() => setCurrentPage('dashboard')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage === 'handover'
-    ) {
+    if (currentPage === 'handover') {
       return (
         <HandoverPage
           session={session}
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'dashboard',
-            )
-          }
+          onBack={() => setCurrentPage('dashboard')}
           onLogout={handleLogout}
         />
       )
     }
 
-    if (
-      currentPage ===
-        'user-management' &&
-      isAdmin
-    ) {
+    if (currentPage === 'user-management' && isAdmin) {
       return (
         <UserManagementPage
           profile={profile}
           loadingLogout={loading}
-          onBack={() =>
-            setCurrentPage(
-              'dashboard',
-            )
-          }
+          onBack={() => setCurrentPage('dashboard')}
           onLogout={handleLogout}
         />
       )
     }
 
+    // FIX: MasterEkspedisiPage sekarang bisa diakses dari dashboard
+    if (currentPage === 'master-ekspedisi' && isAdminOrWarehouse) {
+      return (
+        <MasterEkspedisiPage
+          profile={profile}
+          loadingLogout={loading}
+          onBack={() => setCurrentPage('dashboard')}
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    // Default: Dashboard
+    // FIX: isAdmin sekarang dikirim ke DashboardPage
     return (
       <DashboardPage
         session={session}
@@ -397,56 +305,33 @@ function App() {
         error={error}
         profile={profile}
         profileLoading={profileLoading}
+        isAdmin={isAdmin}
+        isAdminOrWarehouse={isAdminOrWarehouse}
         onLogout={handleLogout}
-        onOpenBinToBin={() =>
-          setCurrentPage(
-            'bin-to-bin',
-          )
-        }
-        onOpenStockCount={() =>
-          setCurrentPage(
-            'stock-count',
-          )
-        }
-        onOpenHandover={() =>
-          setCurrentPage(
-            'handover',
-          )
-        }
-        onOpenScanPack={() =>
-          setCurrentPage(
-            'scan-pack',
-          )
-        }
-        onOpenUserManagement={() =>
-          setCurrentPage(
-            'user-management',
-          )
-        }
+        onOpenBinToBin={() => setCurrentPage('bin-to-bin')}
+        onOpenStockCount={() => setCurrentPage('stock-count')}
+        onOpenHandover={() => setCurrentPage('handover')}
+        onOpenScanPack={() => setCurrentPage('scan-pack')}
+        onOpenUserManagement={() => setCurrentPage('user-management')}
+        onOpenMasterEkspedisi={() => setCurrentPage('master-ekspedisi')}
       />
     )
   }
 
+  // ─── Halaman Login ───────────────────────────────────────────
   return (
     <main className="login-page">
       <section className="login-card">
-        <div className="logo-box">
-          BC
-        </div>
+        <div className="logo-box">BC</div>
 
-        <h1>
-          BCL Warehouse WMS
-        </h1>
+        <h1>BCL Warehouse WMS</h1>
 
         <p className="subtitle">
-          Login untuk membuka dashboard
-          warehouse
+          Login untuk membuka dashboard warehouse
         </p>
 
         <form onSubmit={handleLogin}>
-          <label htmlFor="email">
-            Email
-          </label>
+          <label htmlFor="email">Email</label>
 
           <input
             id="email"
@@ -455,56 +340,33 @@ function App() {
             placeholder="nama@email.com"
             autoComplete="email"
             disabled={loading}
-            onChange={(event) =>
-              setEmail(
-                event.target.value,
-              )
-            }
+            onChange={(event) => setEmail(event.target.value)}
           />
 
-          <label htmlFor="password">
-            Password
-          </label>
+          <label htmlFor="password">Password</label>
 
           <div className="password-wrapper">
             <input
               id="password"
-              type={
-                showPassword
-                  ? 'text'
-                  : 'password'
-              }
+              type={showPassword ? 'text' : 'password'}
               value={password}
               placeholder="Masukkan password"
               autoComplete="current-password"
               disabled={loading}
-              onChange={(event) =>
-                setPassword(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setPassword(event.target.value)}
             />
 
             <button
               className="show-password"
               type="button"
-              onClick={() =>
-                setShowPassword(
-                  (current) =>
-                    !current,
-                )
-              }
+              onClick={() => setShowPassword((current) => !current)}
             >
-              {showPassword
-                ? 'Sembunyikan'
-                : 'Lihat'}
+              {showPassword ? 'Sembunyikan' : 'Lihat'}
             </button>
           </div>
 
           {error && (
-            <div className="error-message">
-              {error}
-            </div>
+            <div className="error-message">{error}</div>
           )}
 
           <button
@@ -512,15 +374,11 @@ function App() {
             type="submit"
             disabled={loading}
           >
-            {loading
-              ? 'Memproses...'
-              : 'Login'}
+            {loading ? 'Memproses...' : 'Login'}
           </button>
         </form>
 
-        <p className="version">
-          BCL Warehouse WMS v1.0
-        </p>
+        <p className="version">BCL Warehouse WMS v1.0</p>
       </section>
     </main>
   )

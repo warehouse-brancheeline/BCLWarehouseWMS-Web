@@ -5,51 +5,21 @@ import {
   useState,
 } from 'react'
 import { supabase } from '../lib/supabase'
+import { formatDate } from '../lib/utils'
 import './UserManagementPage.css'
 
 const roleOptions = [
-  {
-    value: 'staff',
-    label: 'Staff',
-  },
-  {
-    value: 'marketplace',
-    label: 'Marketplace',
-  },
-  {
-    value: 'admin_warehouse',
-    label: 'Admin Warehouse',
-  },
-  {
-    value: 'admin',
-    label: 'Admin',
-  },
+  { value: 'staff', label: 'Staff' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'admin_warehouse', label: 'Admin Warehouse' },
+  { value: 'admin', label: 'Admin' },
 ]
 
 function getRoleLabel(role) {
   const selectedRole = roleOptions.find(
     (option) => option.value === role,
   )
-
   return selectedRole?.label || role || '-'
-}
-
-function formatDate(value) {
-  if (!value) {
-    return '-'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Makassar',
-  }).format(date)
 }
 
 async function invokeAdminCreateUser(payload) {
@@ -58,13 +28,9 @@ async function invokeAdminCreateUser(payload) {
     error: sessionError,
   } = await supabase.auth.getSession()
 
-  const currentSession =
-    sessionData?.session
+  const currentSession = sessionData?.session
 
-  if (
-    sessionError ||
-    !currentSession?.access_token
-  ) {
+  if (sessionError || !currentSession?.access_token) {
     throw new Error(
       'Session login tidak ditemukan. Silakan login ulang.',
     )
@@ -75,10 +41,8 @@ async function invokeAdminCreateUser(payload) {
   ).replace(/\/$/, '')
 
   const apiKey =
-    import.meta.env
-      .VITE_SUPABASE_PUBLISHABLE_KEY ||
-    import.meta.env
-      .VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
     ''
 
   if (!supabaseUrl || !apiKey) {
@@ -92,8 +56,7 @@ async function invokeAdminCreateUser(payload) {
     {
       method: 'POST',
       headers: {
-        Authorization:
-          `Bearer ${currentSession.access_token}`,
+        Authorization: `Bearer ${currentSession.access_token}`,
         apikey: apiKey,
         'Content-Type': 'application/json',
       },
@@ -101,8 +64,7 @@ async function invokeAdminCreateUser(payload) {
     },
   )
 
-  const responseText =
-    await response.text()
+  const responseText = await response.text()
 
   let result = null
 
@@ -110,21 +72,16 @@ async function invokeAdminCreateUser(payload) {
     try {
       result = JSON.parse(responseText)
     } catch {
-      result = {
-        message: responseText,
-      }
+      result = { message: responseText }
     }
   }
 
   if (!response.ok) {
-    console.error(
-      'Admin create user gagal:',
-      {
-        status: response.status,
-        responseText,
-        result,
-      },
-    )
+    console.error('Admin create user gagal:', {
+      status: response.status,
+      responseText,
+      result,
+    })
 
     const responseMessage =
       typeof result?.message === 'string'
@@ -147,21 +104,18 @@ async function invokeAdminCreateUser(payload) {
       errorMessage,
     ].find(
       (message) =>
-        message &&
-        message !== '{}' &&
-        message !== '[]',
+        message && message !== '{}' && message !== '[]',
     )
 
     throw new Error(
       usefulMessage ||
-      `Edge Function gagal merespons. HTTP ${response.status}.`,
+        `Edge Function gagal merespons. HTTP ${response.status}.`,
     )
   }
 
   if (!result?.success) {
     throw new Error(
-      typeof result?.message === 'string' &&
-      result.message.trim()
+      typeof result?.message === 'string' && result.message.trim()
         ? result.message
         : 'Server tidak memberikan hasil pendaftaran yang valid.',
     )
@@ -177,48 +131,21 @@ function UserManagementPage({
   onLogout,
 }) {
   const [users, setUsers] = useState([])
-
-  const [fullName, setFullName] =
-    useState('')
-
-  const [email, setEmail] =
-    useState('')
-
-  const [password, setPassword] =
-    useState('')
-
-  const [role, setRole] =
-    useState('staff')
-
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false)
-
-  const [
-    loadingUsers,
-    setLoadingUsers,
-  ] = useState(true)
-
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false)
-
-  const [error, setError] =
-    useState('')
-
-  const [success, setSuccess] =
-    useState('')
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState('staff')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true)
     setError('')
 
-    const {
-      data,
-      error: usersError,
-    } = await supabase
+    const { data, error: usersError } = await supabase
       .from('profiles')
       .select(`
         id,
@@ -229,19 +156,11 @@ function UserManagementPage({
         created_at,
         updated_at
       `)
-      .order('created_at', {
-        ascending: false,
-      })
+      .order('created_at', { ascending: false })
 
     if (usersError) {
-      console.error(
-        'Gagal memuat daftar user:',
-        usersError,
-      )
-
-      setError(
-        'Gagal memuat daftar user.',
-      )
+      console.error('Gagal memuat daftar user:', usersError)
+      setError('Gagal memuat daftar user.')
       setUsers([])
     } else {
       setUsers(data ?? [])
@@ -263,9 +182,7 @@ function UserManagementPage({
       setSuccess('')
     }, 5000)
 
-    return () => {
-      window.clearTimeout(timer)
-    }
+    return () => window.clearTimeout(timer)
   }, [success])
 
   const summary = useMemo(() => {
@@ -280,8 +197,7 @@ function UserManagementPage({
     return {
       total: users.length,
       active: activeUsers,
-      inactive:
-        users.length - activeUsers,
+      inactive: users.length - activeUsers,
       admin: adminUsers,
     }
   }, [users])
@@ -297,33 +213,21 @@ function UserManagementPage({
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const normalizedName =
-      fullName.trim()
-
-    const normalizedEmail =
-      email.trim().toLowerCase()
+    const normalizedName = fullName.trim()
+    const normalizedEmail = email.trim().toLowerCase()
 
     if (!normalizedName) {
-      setError(
-        'Nama lengkap wajib diisi.',
-      )
+      setError('Nama lengkap wajib diisi.')
       return
     }
 
-    if (
-      !normalizedEmail ||
-      !normalizedEmail.includes('@')
-    ) {
-      setError(
-        'Email tidak valid.',
-      )
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setError('Email tidak valid.')
       return
     }
 
     if (password.length < 8) {
-      setError(
-        'Password minimal 8 karakter.',
-      )
+      setError('Password minimal 8 karakter.')
       return
     }
 
@@ -332,26 +236,21 @@ function UserManagementPage({
     setSuccess('')
 
     try {
-      const data =
-        await invokeAdminCreateUser({
-          fullName: normalizedName,
-          email: normalizedEmail,
-          password,
-          role,
-        })
+      const data = await invokeAdminCreateUser({
+        fullName: normalizedName,
+        email: normalizedEmail,
+        password,
+        role,
+      })
 
       setSuccess(
-        data?.message ||
-        `${normalizedName} berhasil didaftarkan.`,
+        data?.message || `${normalizedName} berhasil didaftarkan.`,
       )
 
       resetForm()
       await loadUsers()
     } catch (submitError) {
-      console.error(
-        'Gagal mendaftarkan user:',
-        submitError,
-      )
+      console.error('Gagal mendaftarkan user:', submitError)
 
       const rawMessage =
         typeof submitError?.message === 'string'
@@ -359,9 +258,7 @@ function UserManagementPage({
           : ''
 
       const safeMessage =
-        rawMessage &&
-        rawMessage !== '{}' &&
-        rawMessage !== '[]'
+        rawMessage && rawMessage !== '{}' && rawMessage !== '[]'
           ? rawMessage
           : 'Edge Function gagal merespons. Periksa deployment dan login ulang.'
 
@@ -375,15 +272,10 @@ function UserManagementPage({
     <main className="user-management-page">
       <header className="user-management-header">
         <div>
-          <p className="small-label">
-            BCL Warehouse WMS
-          </p>
-
+          <p className="small-label">BCL Warehouse WMS</p>
           <h1>Manajemen User</h1>
-
           <p className="user-management-subtitle">
-            Daftarkan akun pengguna baru
-            untuk aplikasi dan website WMS.
+            Daftarkan akun pengguna baru untuk aplikasi dan website WMS.
           </p>
         </div>
 
@@ -402,9 +294,7 @@ function UserManagementPage({
             disabled={loadingUsers}
             onClick={loadUsers}
           >
-            {loadingUsers
-              ? 'Memuat...'
-              : 'Refresh'}
+            {loadingUsers ? 'Memuat...' : 'Refresh'}
           </button>
 
           <button
@@ -413,9 +303,7 @@ function UserManagementPage({
             disabled={loadingLogout}
             onClick={onLogout}
           >
-            {loadingLogout
-              ? 'Keluar...'
-              : 'Logout'}
+            {loadingLogout ? 'Keluar...' : 'Logout'}
           </button>
         </div>
       </header>
@@ -424,22 +312,13 @@ function UserManagementPage({
         <article className="admin-information">
           <div>
             <span>Admin aktif</span>
-
             <strong>
-              {profile?.full_name ||
-                profile?.email ||
-                '-'}
+              {profile?.full_name || profile?.email || '-'}
             </strong>
           </div>
-
           <div>
             <span>Role</span>
-
-            <strong>
-              {getRoleLabel(
-                profile?.role,
-              )}
-            </strong>
+            <strong>{getRoleLabel(profile?.role)}</strong>
           </div>
         </article>
 
@@ -448,17 +327,14 @@ function UserManagementPage({
             <p>Total User</p>
             <strong>{summary.total}</strong>
           </article>
-
           <article className="user-summary-card">
             <p>User Aktif</p>
             <strong>{summary.active}</strong>
           </article>
-
           <article className="user-summary-card">
             <p>User Nonaktif</p>
             <strong>{summary.inactive}</strong>
           </article>
-
           <article className="user-summary-card">
             <p>Total Admin</p>
             <strong>{summary.admin}</strong>
@@ -470,22 +346,14 @@ function UserManagementPage({
             <div className="panel-heading">
               <div>
                 <h2>Daftarkan User</h2>
-
                 <p>
-                  Akun akan langsung aktif dan
-                  bisa digunakan untuk login.
+                  Akun akan langsung aktif dan bisa digunakan untuk login.
                 </p>
               </div>
             </div>
 
-            <form
-              className="user-form"
-              onSubmit={handleSubmit}
-            >
-              <label htmlFor="full-name">
-                Nama Lengkap
-              </label>
-
+            <form className="user-form" onSubmit={handleSubmit}>
+              <label htmlFor="full-name">Nama Lengkap</label>
               <input
                 id="full-name"
                 type="text"
@@ -493,17 +361,10 @@ function UserManagementPage({
                 placeholder="Contoh: Putri"
                 autoComplete="name"
                 disabled={submitting}
-                onChange={(event) =>
-                  setFullName(
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => setFullName(event.target.value)}
               />
 
-              <label htmlFor="new-user-email">
-                Email
-              </label>
-
+              <label htmlFor="new-user-email">Email</label>
               <input
                 id="new-user-email"
                 type="email"
@@ -511,88 +372,52 @@ function UserManagementPage({
                 placeholder="nama@brancheeline.com"
                 autoComplete="off"
                 disabled={submitting}
-                onChange={(event) =>
-                  setEmail(
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => setEmail(event.target.value)}
               />
 
-              <label htmlFor="new-user-password">
-                Password
-              </label>
-
+              <label htmlFor="new-user-password">Password</label>
               <div className="user-password-wrapper">
                 <input
                   id="new-user-password"
-                  type={
-                    showPassword
-                      ? 'text'
-                      : 'password'
-                  }
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   placeholder="Minimal 8 karakter"
                   autoComplete="new-password"
                   disabled={submitting}
-                  onChange={(event) =>
-                    setPassword(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setPassword(event.target.value)}
                 />
-
                 <button
                   className="user-show-password"
                   type="button"
                   disabled={submitting}
                   onClick={() =>
-                    setShowPassword(
-                      (current) => !current,
-                    )
+                    setShowPassword((current) => !current)
                   }
                 >
-                  {showPassword
-                    ? 'Sembunyikan'
-                    : 'Lihat'}
+                  {showPassword ? 'Sembunyikan' : 'Lihat'}
                 </button>
               </div>
 
-              <label htmlFor="new-user-role">
-                Role
-              </label>
-
+              <label htmlFor="new-user-role">Role</label>
               <select
                 id="new-user-role"
                 value={role}
                 disabled={submitting}
-                onChange={(event) =>
-                  setRole(
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => setRole(event.target.value)}
               >
-                {roleOptions.map(
-                  (option) => (
-                    <option
-                      key={option.value}
-                      value={option.value}
-                    >
-                      {option.label}
-                    </option>
-                  ),
-                )}
+                {roleOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
 
               {error ? (
-                <div className="user-error-message">
-                  {error}
-                </div>
+                <div className="user-error-message">{error}</div>
               ) : null}
 
               {success ? (
-                <div className="user-success-message">
-                  {success}
-                </div>
+                <div className="user-success-message">{success}</div>
               ) : null}
 
               <button
@@ -600,9 +425,7 @@ function UserManagementPage({
                 type="submit"
                 disabled={submitting}
               >
-                {submitting
-                  ? 'Mendaftarkan...'
-                  : 'Daftarkan User'}
+                {submitting ? 'Mendaftarkan...' : 'Daftarkan User'}
               </button>
             </form>
           </section>
@@ -611,11 +434,7 @@ function UserManagementPage({
             <div className="panel-heading">
               <div>
                 <h2>Daftar User</h2>
-
-                <p>
-                  Seluruh akun yang terdaftar
-                  di BCL Warehouse WMS.
-                </p>
+                <p>Seluruh akun yang terdaftar di BCL Warehouse WMS.</p>
               </div>
             </div>
 
@@ -626,15 +445,13 @@ function UserManagementPage({
               </div>
             ) : null}
 
-            {!loadingUsers &&
-            users.length === 0 ? (
+            {!loadingUsers && users.length === 0 ? (
               <div className="user-list-message">
                 Belum ada data user.
               </div>
             ) : null}
 
-            {!loadingUsers &&
-            users.length > 0 ? (
+            {!loadingUsers && users.length > 0 ? (
               <div className="user-table-wrapper">
                 <table className="user-table">
                   <thead>
@@ -646,26 +463,16 @@ function UserManagementPage({
                       <th>Dibuat</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {users.map((user) => (
                       <tr key={user.id}>
-                        <td>
-                          {user.full_name || '-'}
-                        </td>
-
-                        <td>
-                          {user.email || '-'}
-                        </td>
-
+                        <td>{user.full_name || '-'}</td>
+                        <td>{user.email || '-'}</td>
                         <td>
                           <span className="user-role-badge">
-                            {getRoleLabel(
-                              user.role,
-                            )}
+                            {getRoleLabel(user.role)}
                           </span>
                         </td>
-
                         <td>
                           <span
                             className={
@@ -674,17 +481,10 @@ function UserManagementPage({
                                 : 'user-status-inactive'
                             }
                           >
-                            {user.is_active
-                              ? 'Aktif'
-                              : 'Nonaktif'}
+                            {user.is_active ? 'Aktif' : 'Nonaktif'}
                           </span>
                         </td>
-
-                        <td>
-                          {formatDate(
-                            user.created_at,
-                          )}
-                        </td>
+                        <td>{formatDate(user.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>

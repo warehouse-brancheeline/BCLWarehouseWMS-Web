@@ -512,3 +512,42 @@
     flex: 1 1 auto;
   }
 }
+
+/* ── Modal Konfirmasi (pengganti window.confirm) ── */
+.bbt-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.bbt-confirm-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.bbt-confirm-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: #1a202c;
+}
+
+.bbt-confirm-dialog p {
+  margin: 0 0 24px;
+  color: #4a5568;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.bbt-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}

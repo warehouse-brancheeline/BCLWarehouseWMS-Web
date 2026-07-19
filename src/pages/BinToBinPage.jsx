@@ -9,57 +9,14 @@ import {
   writeFileXLSX,
 } from 'xlsx'
 import { supabase } from '../lib/supabase'
+import {
+  formatDate,
+  formatQty,
+  pickValue,
+  safeFilename,
+  toNumber,
+} from '../lib/utils'
 import './BinToBinPage.css'
-
-function pickValue(row, keys, fallback = '') {
-  if (!row) {
-    return fallback
-  }
-
-  for (const key of keys) {
-    const value = row[key]
-
-    if (
-      value !== undefined &&
-      value !== null &&
-      value !== ''
-    ) {
-      return value
-    }
-  }
-
-  return fallback
-}
-
-function toNumber(value) {
-  const numberValue = Number(value)
-  return Number.isNaN(numberValue)
-    ? 0
-    : numberValue
-}
-
-function formatDate(value) {
-  if (!value) {
-    return '-'
-  }
-
-  const parsedDate = new Date(value)
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return String(value)
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(parsedDate)
-}
-
-function formatQty(value) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 2,
-  }).format(toNumber(value))
-}
 
 function normalizeProcessStatus(value) {
   const normalized = String(value || 'DRAFT')
@@ -104,41 +61,119 @@ function getProcessStatusDescription(status) {
 function getProcessStatusClass(status) {
   const value = normalizeProcessStatus(status)
 
-  if (value === 'DRAFT') {
-    return 'bbt-status-draft'
+  const classMap = {
+    DRAFT: 'bbt-status-draft',
+    SUBMITTED: 'bbt-status-submitted',
+    PROCESSING: 'bbt-status-processing',
+    POSTED: 'bbt-status-posted',
+    REJECTED: 'bbt-status-rejected',
+    CANCELLED: 'bbt-status-cancelled',
+    CLOSED: 'bbt-status-closed',
   }
 
-  if (value === 'SUBMITTED') {
-    return 'bbt-status-submitted'
-  }
-
-  if (value === 'PROCESSING') {
-    return 'bbt-status-processing'
-  }
-
-  if (value === 'POSTED') {
-    return 'bbt-status-posted'
-  }
-
-  if (value === 'REJECTED') {
-    return 'bbt-status-rejected'
-  }
-
-  if (value === 'CANCELLED') {
-    return 'bbt-status-cancelled'
-  }
-
-  if (value === 'CLOSED') {
-    return 'bbt-status-closed'
-  }
-
-  return 'bbt-status-submitted'
+  return classMap[value] || 'bbt-status-submitted'
 }
 
-function safeFilename(value) {
-  return String(value || 'Bin-To-Bin')
-    .replace(/[\\/:*?"<>|]/g, '-')
-    .replace(/\s+/g, '_')
+function getAllowedStatusActions(status) {
+  const normalized = normalizeProcessStatus(status)
+
+  if (normalized === 'SUBMITTED') {
+    return [
+      { label: 'Mulai Proses', action: 'PROCESSING' },
+      { label: 'Reject', action: 'REJECTED' },
+      { label: 'Cancel', action: 'CANCELLED' },
+    ]
+  }
+
+  if (normalized === 'PROCESSING') {
+    return [
+      { label: 'Tandai Posted', action: 'POSTED' },
+      { label: 'Reject', action: 'REJECTED' },
+      { label: 'Cancel', action: 'CANCELLED' },
+    ]
+  }
+
+  if (normalized === 'DRAFT') {
+    return [{ label: 'Cancel', action: 'CANCELLED' }]
+  }
+
+  if (normalized === 'POSTED') {
+    return [{ label: 'Close Transaction', action: 'CLOSED' }]
+  }
+
+  return []
+}
+
+function resolveTransferNumber(transfer, transferId) {
+  const value = pickValue(
+    transfer,
+    [
+      'transfer_number',
+      'transfer_no',
+      'transaction_number',
+      'reference_no',
+      'document_number',
+    ],
+    '',
+  )
+
+  if (value) {
+    return String(value)
+  }
+
+  if (transferId) {
+    return `BT-${String(transferId).slice(0, 8).toUpperCase()}`
+  }
+
+  return 'BT-UNKNOWN'
+}
+
+function resolveStaffName(transfer, profilesById) {
+  const directName = pickValue(
+    transfer,
+    [
+      'staff_name',
+      'created_by_name',
+      'submitted_by_name',
+      'user_name',
+      'user_email',
+    ],
+    '',
+  )
+
+  if (directName) {
+    return String(directName)
+  }
+
+  const userId = pickValue(
+    transfer,
+    ['created_by', 'user_id', 'submitted_by', 'staff_id'],
+    '',
+  )
+
+  if (!userId) {
+    return '-'
+  }
+
+  const profile = profilesById.get(String(userId))
+
+  if (profile) {
+    const profileName = pickValue(
+      profile,
+      ['full_name', 'name', 'display_name'],
+      '',
+    )
+    if (profileName) {
+      return String(profileName)
+    }
+
+    const profileEmail = pickValue(profile, ['email'], '')
+    if (profileEmail) {
+      return String(profileEmail)
+    }
+  }
+
+  return String(userId).slice(0, 8)
 }
 
 function BinToBinPage({
@@ -154,8 +189,15 @@ function BinToBinPage({
   const [error, setError] = useState('')
   const [currentUserName, setCurrentUserName] = useState('')
   const [statusNote, setStatusNote] = useState('')
-  const [statusFeedback, setStatusFeedback] = useState({ type: '', message: '' })
+  const [statusFeedback, setStatusFeedback] = useState({
+    type: '',
+    message: '',
+  })
   const [updatingStatus, setUpdatingStatus] = useState(false)
+
+  // ── Modal konfirmasi (ganti window.confirm) ──────────────────
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  // confirmDialog = { action, actionLabel, onConfirm } | null
 
   useEffect(() => {
     const loadUserName = async () => {
@@ -169,9 +211,9 @@ function BinToBinPage({
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('full_name, email')
           .eq('id', userId)
-          .single()
+          .maybeSingle()
 
         if (profile) {
           const resolvedName = pickValue(
@@ -179,7 +221,6 @@ function BinToBinPage({
             ['full_name', 'name', 'display_name', 'email'],
             userEmail,
           )
-
           setCurrentUserName(String(resolvedName || userEmail || ''))
         } else if (userEmail) {
           setCurrentUserName(userEmail)
@@ -206,15 +247,8 @@ function BinToBinPage({
 
     try {
       const [transferResult, itemResult] = await Promise.all([
-        supabase
-          .from('bin_transfers')
-          .select('*')
-          .limit(1000),
-
-        supabase
-          .from('bin_transfer_items')
-          .select('*')
-          .limit(10000),
+        supabase.from('bin_transfers').select('*').limit(1000),
+        supabase.from('bin_transfer_items').select('*').limit(10000),
       ])
 
       if (transferResult.error) {
@@ -230,7 +264,9 @@ function BinToBinPage({
 
       const transferIds = new Set(
         transferRows
-          .map((transfer) => String(pickValue(transfer, ['id'], '')))
+          .map((transfer) =>
+            String(pickValue(transfer, ['id'], '')),
+          )
           .filter(Boolean),
       )
 
@@ -238,7 +274,6 @@ function BinToBinPage({
         const transferId = String(
           pickValue(item, ['transfer_id', 'bin_transfer_id'], ''),
         )
-
         return transferIds.has(transferId)
       })
 
@@ -247,8 +282,16 @@ function BinToBinPage({
       const profileIds = new Set()
 
       transferRows.forEach((transfer) => {
-        const sourceBinId = pickValue(transfer, ['source_bin_id', 'from_bin_id'], '')
-        const destinationBinId = pickValue(transfer, ['destination_bin_id', 'to_bin_id'], '')
+        const sourceBinId = pickValue(
+          transfer,
+          ['source_bin_id', 'from_bin_id'],
+          '',
+        )
+        const destinationBinId = pickValue(
+          transfer,
+          ['destination_bin_id', 'to_bin_id'],
+          '',
+        )
 
         if (sourceBinId) {
           binIds.add(String(sourceBinId))
@@ -270,7 +313,11 @@ function BinToBinPage({
       })
 
       validItems.forEach((item) => {
-        const skuId = pickValue(item, ['sku_id', 'item_id', 'product_id'], '')
+        const skuId = pickValue(
+          item,
+          ['sku_id', 'item_id', 'product_id'],
+          '',
+        )
         if (skuId) {
           skuIds.add(String(skuId))
         }
@@ -278,18 +325,12 @@ function BinToBinPage({
 
       const binQuery =
         binIds.size > 0
-          ? supabase
-              .from('bins')
-              .select('*')
-              .in('id', Array.from(binIds))
+          ? supabase.from('bins').select('*').in('id', Array.from(binIds))
           : Promise.resolve({ data: [], error: null })
 
       const skuQuery =
         skuIds.size > 0
-          ? supabase
-              .from('skus')
-              .select('*')
-              .in('id', Array.from(skuIds))
+          ? supabase.from('skus').select('*').in('id', Array.from(skuIds))
           : Promise.resolve({ data: [], error: null })
 
       const profileQuery =
@@ -328,7 +369,11 @@ function BinToBinPage({
 
       const profilesById = new Map()
       ;(profileResult.data ?? []).forEach((profile) => {
-        const possibleIds = [profile.id, profile.user_id, profile.auth_user_id]
+        const possibleIds = [
+          profile.id,
+          profile.user_id,
+          profile.auth_user_id,
+        ]
         possibleIds.forEach((id) => {
           if (id) {
             profilesById.set(String(id), profile)
@@ -380,20 +425,40 @@ function BinToBinPage({
               skuName: pickValue(
                 sku,
                 ['sku_name', 'name', 'description', 'product_name'],
-                pickValue(item, ['sku_name', 'description', 'product_name'], '-'),
+                pickValue(
+                  item,
+                  ['sku_name', 'description', 'product_name'],
+                  '-',
+                ),
               ),
-              qty: pickValue(item, ['qty', 'quantity', 'moved_qty', 'transfer_qty'], '0'),
+              qty: pickValue(
+                item,
+                ['qty', 'quantity', 'moved_qty', 'transfer_qty'],
+                '0',
+              ),
               notes: pickValue(item, ['notes', 'remarks', 'note'], '-'),
-              createdAt: pickValue(item, ['created_at', 'input_at', 'updated_at', 'submitted_at'], ''),
+              createdAt: pickValue(
+                item,
+                ['created_at', 'input_at', 'updated_at', 'submitted_at'],
+                '',
+              ),
               sourceBin: pickValue(
                 transfer,
                 ['source_bin_code', 'from_bin_code'],
-                pickValue(sourceBin, ['bin_code', 'code', 'location_code', 'name'], '-'),
+                pickValue(
+                  sourceBin,
+                  ['bin_code', 'code', 'location_code', 'name'],
+                  '-',
+                ),
               ),
               destinationBin: pickValue(
                 transfer,
                 ['destination_bin_code', 'to_bin_code'],
-                pickValue(destinationBin, ['bin_code', 'code', 'location_code', 'name'], '-'),
+                pickValue(
+                  destinationBin,
+                  ['bin_code', 'code', 'location_code', 'name'],
+                  '-',
+                ),
               ),
             }
           })
@@ -410,7 +475,11 @@ function BinToBinPage({
 
         const staffName = resolveStaffName(transfer, profilesById)
         const statusValue = normalizeProcessStatus(
-          pickValue(transfer, ['status', 'transfer_status', 'bin_transfer_status'], 'DRAFT'),
+          pickValue(
+            transfer,
+            ['status', 'transfer_status', 'bin_transfer_status'],
+            'DRAFT',
+          ),
         )
 
         return {
@@ -420,42 +489,84 @@ function BinToBinPage({
           sourceBin: pickValue(
             transfer,
             ['source_bin_code', 'from_bin_code'],
-            pickValue(sourceBin, ['bin_code', 'code', 'location_code', 'name'], '-'),
+            pickValue(
+              sourceBin,
+              ['bin_code', 'code', 'location_code', 'name'],
+              '-',
+            ),
           ),
           destinationBin: pickValue(
             transfer,
             ['destination_bin_code', 'to_bin_code'],
-            pickValue(destinationBin, ['bin_code', 'code', 'location_code', 'name'], '-'),
+            pickValue(
+              destinationBin,
+              ['bin_code', 'code', 'location_code', 'name'],
+              '-',
+            ),
           ),
           totalRows: detailRows.length,
-          totalQty: detailRows.reduce((sum, item) => sum + toNumber(item.qty), 0),
+          totalQty: detailRows.reduce(
+            (sum, item) => sum + toNumber(item.qty),
+            0,
+          ),
           status: statusValue,
           statusDescription: getProcessStatusDescription(statusValue),
           statusNotes: pickValue(
             transfer,
-            ['status_notes', 'process_notes', 'workflow_notes', 'decision_notes', 'notes', 'remarks', 'note'],
+            [
+              'status_notes',
+              'process_notes',
+              'workflow_notes',
+              'decision_notes',
+              'notes',
+              'remarks',
+              'note',
+            ],
             '',
           ),
-          processingByName: pickValue(transfer, ['processing_by_name'], '-'),
+          processingByName: pickValue(
+            transfer,
+            ['processing_by_name'],
+            '-',
+          ),
           processingAt: pickValue(
             transfer,
-            ['processing_at', 'started_at', 'in_progress_at', 'updated_at'],
+            [
+              'processing_at',
+              'started_at',
+              'in_progress_at',
+              'updated_at',
+            ],
             '',
           ),
           processedByName: pickValue(transfer, ['processed_by_name'], '-'),
           processedAt: pickValue(
             transfer,
-            ['processed_at', 'posted_at', 'completed_at', 'approved_at', 'done_at'],
+            [
+              'processed_at',
+              'posted_at',
+              'completed_at',
+              'approved_at',
+              'done_at',
+            ],
             '',
           ),
           rejectedByName: pickValue(transfer, ['rejected_by_name'], '-'),
           rejectedAt: pickValue(transfer, ['rejected_at'], ''),
           cancelledByName: pickValue(transfer, ['cancelled_by_name'], '-'),
-          cancelledAt: pickValue(transfer, ['cancelled_at', 'canceled_at'], ''),
+          cancelledAt: pickValue(
+            transfer,
+            ['cancelled_at', 'canceled_at'],
+            '',
+          ),
           closedByName: pickValue(transfer, ['closed_by_name'], '-'),
           closedAt: pickValue(transfer, ['closed_at'], ''),
           notes: pickValue(transfer, ['notes', 'remarks', 'note'], '-'),
-          createdAt: pickValue(transfer, ['created_at', 'submitted_at', 'transfer_date'], ''),
+          createdAt: pickValue(
+            transfer,
+            ['created_at', 'submitted_at', 'transfer_date'],
+            '',
+          ),
           detailRows,
         }
       })
@@ -501,9 +612,7 @@ function BinToBinPage({
         transaction.status,
         transaction.notes,
       ].some((value) =>
-        String(value)
-          .toLowerCase()
-          .includes(keyword),
+        String(value).toLowerCase().includes(keyword),
       ),
     )
   }, [transactions, search])
@@ -518,8 +627,14 @@ function BinToBinPage({
     return {
       totalTransactions: transactions.length,
       totalStaff,
-      totalRows: transactions.reduce((sum, transaction) => sum + transaction.totalRows, 0),
-      totalQty: transactions.reduce((sum, transaction) => sum + transaction.totalQty, 0),
+      totalRows: transactions.reduce(
+        (sum, transaction) => sum + transaction.totalRows,
+        0,
+      ),
+      totalQty: transactions.reduce(
+        (sum, transaction) => sum + transaction.totalQty,
+        0,
+      ),
     }
   }, [transactions])
 
@@ -528,7 +643,11 @@ function BinToBinPage({
       return null
     }
 
-    return transactions.find((transaction) => transaction.id === selectedTransferId) ?? null
+    return (
+      transactions.find(
+        (transaction) => transaction.id === selectedTransferId,
+      ) ?? null
+    )
   }, [selectedTransferId, transactions])
 
   const handleStatusAction = async (action) => {
@@ -536,7 +655,8 @@ function BinToBinPage({
       return
     }
 
-    const requiresNote = action === 'REJECTED' || action === 'CANCELLED'
+    const requiresNote =
+      action === 'REJECTED' || action === 'CANCELLED'
     const noteValue = statusNote.trim()
 
     if (requiresNote && !noteValue) {
@@ -555,52 +675,59 @@ function BinToBinPage({
       CLOSED: 'Close Transaction',
     }[action]
 
-    const confirmed = window.confirm(`Apakah Anda yakin ingin ${actionLabel.toLowerCase()} transaksi ini?`)
+    // Ganti window.confirm dengan modal
+    setConfirmDialog({
+      action,
+      actionLabel,
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setUpdatingStatus(true)
+        setStatusFeedback({ type: '', message: '' })
 
-    if (!confirmed) {
-      return
-    }
+        try {
+          const actorName =
+            (currentUserName || '').trim() ||
+            session?.user?.email ||
+            'User Warehouse'
 
-    setUpdatingStatus(true)
-    setStatusFeedback({ type: '', message: '' })
+          const { data, error: rpcError } = await supabase.rpc(
+            'update_bin_transfer_status',
+            {
+              p_transfer_id: selectedTransfer.id,
+              p_action: action,
+              p_actor_name: actorName,
+              p_notes: noteValue,
+            },
+          )
 
-    try {
-      const actorName =
-        (currentUserName || '').trim() ||
-        session?.user?.email ||
-        'User Warehouse'
-      const { data, error: rpcError } = await supabase.rpc('update_bin_transfer_status', {
-        p_transfer_id: selectedTransfer.id,
-        p_action: action,
-        p_actor_name: actorName,
-        p_notes: noteValue,
-      })
+          if (rpcError) {
+            throw rpcError
+          }
 
-      if (rpcError) {
-        throw rpcError
-      }
+          const firstResponse = Array.isArray(data) ? data[0] : data
 
-      const firstResponse = Array.isArray(data) ? data[0] : data
+          if (!firstResponse) {
+            throw new Error('Respons RPC kosong.')
+          }
 
-      if (!firstResponse) {
-        throw new Error('Respons RPC kosong.')
-      }
-
-      setStatusFeedback({
-        type: 'success',
-        message: 'Status transaksi berhasil diperbarui.',
-      })
-      setStatusNote('')
-      await loadHistory({ preserveSelection: true })
-    } catch (loadError) {
-      console.error(loadError)
-      setStatusFeedback({
-        type: 'error',
-        message: loadError?.message || 'Gagal memperbarui status transaksi.',
-      })
-    } finally {
-      setUpdatingStatus(false)
-    }
+          setStatusFeedback({
+            type: 'success',
+            message: 'Status transaksi berhasil diperbarui.',
+          })
+          setStatusNote('')
+          await loadHistory({ preserveSelection: true })
+        } catch (rpcError) {
+          console.error(rpcError)
+          setStatusFeedback({
+            type: 'error',
+            message:
+              rpcError?.message || 'Gagal memperbarui status transaksi.',
+          })
+        } finally {
+          setUpdatingStatus(false)
+        }
+      },
+    })
   }
 
   const handleDownloadExcel = () => {
@@ -649,14 +776,20 @@ function BinToBinPage({
     ])
 
     const detailSheet = utils.aoa_to_sheet([
-      ['No', 'SKU', 'Deskripsi', 'Qty', 'Lokasi Asal', 'Lokasi Tujuan', 'Catatan', 'Waktu Input'],
+      [
+        'No',
+        'SKU',
+        'Deskripsi',
+        'Qty',
+        'Lokasi Asal',
+        'Lokasi Tujuan',
+        'Catatan',
+        'Waktu Input',
+      ],
       ...detailRows,
     ])
 
-    summarySheet['!cols'] = [
-      { width: 28 },
-      { width: 38 },
-    ]
+    summarySheet['!cols'] = [{ width: 28 }, { width: 38 }]
 
     detailSheet['!cols'] = [
       { width: 8 },
@@ -680,7 +813,11 @@ function BinToBinPage({
       <header className="bbt-header">
         <div>
           <p className="bbt-small-label">BCL Warehouse WMS</p>
-          <h1>{selectedTransfer ? 'Detail Bin to Bin' : 'Transaksi Bin to Bin'}</h1>
+          <h1>
+            {selectedTransfer
+              ? 'Detail Bin to Bin'
+              : 'Transaksi Bin to Bin'}
+          </h1>
         </div>
 
         <div className="bbt-header-actions">
@@ -714,7 +851,6 @@ function BinToBinPage({
             >
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
-
             <span>Kembali</span>
           </button>
 
@@ -724,8 +860,7 @@ function BinToBinPage({
             disabled={loading}
             onClick={() =>
               loadHistory({
-                preserveSelection:
-                  Boolean(selectedTransfer),
+                preserveSelection: Boolean(selectedTransfer),
               })
             }
           >
@@ -748,9 +883,7 @@ function BinToBinPage({
             disabled={loadingLogout}
             onClick={onLogout}
           >
-            {loadingLogout
-              ? 'Keluar...'
-              : 'Logout'}
+            {loadingLogout ? 'Keluar...' : 'Logout'}
           </button>
         </div>
       </header>
@@ -765,7 +898,9 @@ function BinToBinPage({
                   <h2>{selectedTransfer.transferNumber}</h2>
                 </div>
                 <div className="bbt-badge-row">
-                  <span className={`bbt-status-badge ${getProcessStatusClass(selectedTransfer.status)}`}>
+                  <span
+                    className={`bbt-status-badge ${getProcessStatusClass(selectedTransfer.status)}`}
+                  >
                     {normalizeProcessStatus(selectedTransfer.status)}
                   </span>
                 </div>
@@ -774,7 +909,9 @@ function BinToBinPage({
               <div className="bbt-detail-grid">
                 <div>
                   <p className="bbt-label">Staff</p>
-                  <strong>{selectedTransfer.staffName || currentUserName || '-'}</strong>
+                  <strong>
+                    {selectedTransfer.staffName || currentUserName || '-'}
+                  </strong>
                 </div>
                 <div>
                   <p className="bbt-label">Tanggal</p>
@@ -802,12 +939,16 @@ function BinToBinPage({
                   <p className="bbt-label">Status Proses Sistem</p>
                   <h3>{selectedTransfer.status}</h3>
                 </div>
-                <span className={`bbt-status-badge ${getProcessStatusClass(selectedTransfer.status)}`}>
+                <span
+                  className={`bbt-status-badge ${getProcessStatusClass(selectedTransfer.status)}`}
+                >
                   {normalizeProcessStatus(selectedTransfer.status)}
                 </span>
               </div>
 
-              <p className="bbt-status-description">{selectedTransfer.statusDescription}</p>
+              <p className="bbt-status-description">
+                {selectedTransfer.statusDescription}
+              </p>
 
               {selectedTransfer.statusNotes ? (
                 <div className="bbt-status-field">
@@ -817,67 +958,103 @@ function BinToBinPage({
               ) : null}
 
               <div className="bbt-status-grid">
-                {selectedTransfer.processingByName || selectedTransfer.processingAt ? (
+                {selectedTransfer.processingByName ||
+                selectedTransfer.processingAt ? (
                   <div className="bbt-status-field">
                     <p className="bbt-label">Processing By</p>
                     <p>{selectedTransfer.processingByName || '-'}</p>
-                    {selectedTransfer.processingAt ? <span>{formatDate(selectedTransfer.processingAt)}</span> : null}
+                    {selectedTransfer.processingAt ? (
+                      <span>
+                        {formatDate(selectedTransfer.processingAt)}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
 
-                {selectedTransfer.processedByName || selectedTransfer.processedAt ? (
+                {selectedTransfer.processedByName ||
+                selectedTransfer.processedAt ? (
                   <div className="bbt-status-field">
                     <p className="bbt-label">Processed By</p>
                     <p>{selectedTransfer.processedByName || '-'}</p>
-                    {selectedTransfer.processedAt ? <span>{formatDate(selectedTransfer.processedAt)}</span> : null}
+                    {selectedTransfer.processedAt ? (
+                      <span>{formatDate(selectedTransfer.processedAt)}</span>
+                    ) : null}
                   </div>
                 ) : null}
 
-                {selectedTransfer.rejectedByName || selectedTransfer.rejectedAt ? (
+                {selectedTransfer.rejectedByName ||
+                selectedTransfer.rejectedAt ? (
                   <div className="bbt-status-field">
                     <p className="bbt-label">Rejected By</p>
                     <p>{selectedTransfer.rejectedByName || '-'}</p>
-                    {selectedTransfer.rejectedAt ? <span>{formatDate(selectedTransfer.rejectedAt)}</span> : null}
+                    {selectedTransfer.rejectedAt ? (
+                      <span>{formatDate(selectedTransfer.rejectedAt)}</span>
+                    ) : null}
                   </div>
                 ) : null}
 
-                {selectedTransfer.cancelledByName || selectedTransfer.cancelledAt ? (
+                {selectedTransfer.cancelledByName ||
+                selectedTransfer.cancelledAt ? (
                   <div className="bbt-status-field">
                     <p className="bbt-label">Cancelled By</p>
                     <p>{selectedTransfer.cancelledByName || '-'}</p>
-                    {selectedTransfer.cancelledAt ? <span>{formatDate(selectedTransfer.cancelledAt)}</span> : null}
+                    {selectedTransfer.cancelledAt ? (
+                      <span>{formatDate(selectedTransfer.cancelledAt)}</span>
+                    ) : null}
                   </div>
                 ) : null}
 
-                {selectedTransfer.closedByName || selectedTransfer.closedAt ? (
+                {selectedTransfer.closedByName ||
+                selectedTransfer.closedAt ? (
                   <div className="bbt-status-field">
                     <p className="bbt-label">Closed By</p>
                     <p>{selectedTransfer.closedByName || '-'}</p>
-                    {selectedTransfer.closedAt ? <span>{formatDate(selectedTransfer.closedAt)}</span> : null}
+                    {selectedTransfer.closedAt ? (
+                      <span>{formatDate(selectedTransfer.closedAt)}</span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
 
               <div className="bbt-status-actions">
                 {statusFeedback.message ? (
-                  <div className={`bbt-feedback ${statusFeedback.type === 'error' ? 'bbt-feedback-error' : 'bbt-feedback-success'}`}>
+                  <div
+                    className={`bbt-feedback ${
+                      statusFeedback.type === 'error'
+                        ? 'bbt-feedback-error'
+                        : 'bbt-feedback-success'
+                    }`}
+                  >
                     {statusFeedback.message}
                   </div>
                 ) : null}
 
-                {getAllowedStatusActions(selectedTransfer.status).map((action) => (
-                  <button
-                    key={action.action}
-                    className={action.action === 'REJECTED' || action.action === 'CANCELLED' ? 'bbt-danger-button' : action.action === 'POSTED' || action.action === 'CLOSED' ? 'bbt-success-button' : 'bbt-primary-button'}
-                    type="button"
-                    disabled={updatingStatus || loading}
-                    onClick={() => handleStatusAction(action.action)}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+                {getAllowedStatusActions(selectedTransfer.status).map(
+                  (action) => (
+                    <button
+                      key={action.action}
+                      className={
+                        action.action === 'REJECTED' ||
+                        action.action === 'CANCELLED'
+                          ? 'bbt-danger-button'
+                          : action.action === 'POSTED' ||
+                              action.action === 'CLOSED'
+                            ? 'bbt-success-button'
+                            : 'bbt-primary-button'
+                      }
+                      type="button"
+                      disabled={updatingStatus || loading}
+                      onClick={() => handleStatusAction(action.action)}
+                    >
+                      {action.label}
+                    </button>
+                  ),
+                )}
 
-                <label className="bbt-status-note-label" htmlFor="status-note">
+                <label
+                  className="bbt-status-note-label"
+                  htmlFor="status-note"
+                >
                   Catatan Status
                 </label>
                 <textarea
@@ -903,7 +1080,15 @@ function BinToBinPage({
               </article>
               <article className="bbt-summary-card">
                 <span>Total Jenis SKU</span>
-                <strong>{new Set(selectedTransfer.detailRows.map((item) => item.skuCode || item.skuName || '-')).size}</strong>
+                <strong>
+                  {
+                    new Set(
+                      selectedTransfer.detailRows.map(
+                        (item) => item.skuCode || item.skuName || '-',
+                      ),
+                    ).size
+                  }
+                </strong>
               </article>
             </div>
 
@@ -935,7 +1120,9 @@ function BinToBinPage({
                           <td>{index + 1}</td>
                           <td>{item.skuCode || '-'}</td>
                           <td>{item.skuName || '-'}</td>
-                          <td><strong>{formatQty(item.qty)}</strong></td>
+                          <td>
+                            <strong>{formatQty(item.qty)}</strong>
+                          </td>
                           <td>{item.sourceBin || '-'}</td>
                           <td>{item.destinationBin || '-'}</td>
                           <td>{item.notes || '-'}</td>
@@ -972,7 +1159,10 @@ function BinToBinPage({
             <div className="bbt-toolbar">
               <div>
                 <h2>Daftar Transaksi Bin to Bin</h2>
-                <p>Cari berdasarkan nomor transaksi, staff, lokasi, status, atau catatan.</p>
+                <p>
+                  Cari berdasarkan nomor transaksi, staff, lokasi, status,
+                  atau catatan.
+                </p>
               </div>
 
               <div className="bbt-toolbar-actions">
@@ -983,7 +1173,6 @@ function BinToBinPage({
                   placeholder="Cari transaksi"
                   onChange={(event) => setSearch(event.target.value)}
                 />
-
               </div>
             </div>
 
@@ -1028,18 +1217,46 @@ function BinToBinPage({
                         <tr key={transaction.id}>
                           <td>{formatDate(transaction.createdAt)}</td>
                           <td>
-                            <button className="bbt-link-button" type="button" onClick={() => setSelectedTransferId(transaction.id)}>
+                            <button
+                              className="bbt-link-button"
+                              type="button"
+                              onClick={() =>
+                                setSelectedTransferId(transaction.id)
+                              }
+                            >
                               {transaction.transferNumber}
                             </button>
                           </td>
                           <td>{transaction.staffName || '-'}</td>
-                          <td><span className="bbt-bin-label">{transaction.sourceBin || '-'}</span></td>
-                          <td><span className="bbt-bin-label">{transaction.destinationBin || '-'}</span></td>
-                          <td>{transaction.totalRows}</td>
-                          <td><strong>{formatQty(transaction.totalQty)}</strong></td>
-                          <td><span className={`bbt-status-badge ${getProcessStatusClass(transaction.status)}`}>{normalizeProcessStatus(transaction.status)}</span></td>
                           <td>
-                            <button className="bbt-link-button" type="button" onClick={() => setSelectedTransferId(transaction.id)}>
+                            <span className="bbt-bin-label">
+                              {transaction.sourceBin || '-'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="bbt-bin-label">
+                              {transaction.destinationBin || '-'}
+                            </span>
+                          </td>
+                          <td>{transaction.totalRows}</td>
+                          <td>
+                            <strong>{formatQty(transaction.totalQty)}</strong>
+                          </td>
+                          <td>
+                            <span
+                              className={`bbt-status-badge ${getProcessStatusClass(transaction.status)}`}
+                            >
+                              {normalizeProcessStatus(transaction.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="bbt-link-button"
+                              type="button"
+                              onClick={() =>
+                                setSelectedTransferId(transaction.id)
+                              }
+                            >
                               Buka Detail
                             </button>
                           </td>
@@ -1053,86 +1270,55 @@ function BinToBinPage({
           </>
         )}
       </section>
+
+      {/* Modal Konfirmasi - pengganti window.confirm */}
+      {confirmDialog ? (
+        <div
+          className="bbt-confirm-backdrop"
+          role="presentation"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <section
+            className="bbt-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bbt-confirm-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="bbt-confirm-title">Konfirmasi Tindakan</h2>
+
+            <p>
+              Apakah Anda yakin ingin{' '}
+              <strong>{confirmDialog.actionLabel}</strong> transaksi ini?
+            </p>
+
+            <div className="bbt-confirm-actions">
+              <button
+                className="bbt-secondary-button"
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Batal
+              </button>
+
+              <button
+                className={
+                  confirmDialog.action === 'REJECTED' ||
+                  confirmDialog.action === 'CANCELLED'
+                    ? 'bbt-danger-button'
+                    : 'bbt-primary-button'
+                }
+                type="button"
+                onClick={confirmDialog.onConfirm}
+              >
+                Ya, Lanjutkan
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   )
-}
-
-function getAllowedStatusActions(status) {
-  const normalized = normalizeProcessStatus(status)
-
-  if (normalized === 'SUBMITTED') {
-    return [
-      { label: 'Mulai Proses', action: 'PROCESSING' },
-      { label: 'Reject', action: 'REJECTED' },
-      { label: 'Cancel', action: 'CANCELLED' },
-    ]
-  }
-
-  if (normalized === 'PROCESSING') {
-    return [
-      { label: 'Tandai Posted', action: 'POSTED' },
-      { label: 'Reject', action: 'REJECTED' },
-      { label: 'Cancel', action: 'CANCELLED' },
-    ]
-  }
-
-  if (normalized === 'DRAFT') {
-    return [{ label: 'Cancel', action: 'CANCELLED' }]
-  }
-
-  if (normalized === 'POSTED') {
-    return [{ label: 'Close Transaction', action: 'CLOSED' }]
-  }
-
-  return []
-}
-
-function resolveTransferNumber(transfer, transferId) {
-  const value = pickValue(transfer, ['transfer_number', 'transfer_no', 'transaction_number', 'reference_no', 'document_number'], '')
-
-  if (value) {
-    return String(value)
-  }
-
-  if (transferId) {
-    return `BT-${String(transferId).slice(0, 8).toUpperCase()}`
-  }
-
-  return 'BT-UNKNOWN'
-}
-
-function resolveStaffName(transfer, profilesById) {
-  const directName = pickValue(
-    transfer,
-    ['staff_name', 'created_by_name', 'submitted_by_name', 'user_name', 'user_email'],
-    '',
-  )
-
-  if (directName) {
-    return String(directName)
-  }
-
-  const userId = pickValue(transfer, ['created_by', 'user_id', 'submitted_by', 'staff_id'], '')
-
-  if (!userId) {
-    return '-'
-  }
-
-  const profile = profilesById.get(String(userId))
-
-  if (profile) {
-    const profileName = pickValue(profile, ['full_name', 'name', 'display_name'], '')
-    if (profileName) {
-      return String(profileName)
-    }
-
-    const profileEmail = pickValue(profile, ['email'], '')
-    if (profileEmail) {
-      return String(profileEmail)
-    }
-  }
-
-  return String(userId).slice(0, 8)
 }
 
 export default BinToBinPage
