@@ -1,0 +1,264 @@
+.master-expedisi-page {
+  min-height: 100vh;
+  background: #f4f7fc;
+}
+
+.master-expedisi-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+  border-bottom: 1px solid #e1e6f0;
+  background: #ffffff;
+}
+
+.master-expedisi-header h1 {
+  margin: 6px 0 4px;
+  color: #17316b;
+}
+
+.master-expedisi-subtitle {
+  margin: 0;
+  color: #6f788c;
+}
+
+.master-expedisi-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.master-expedisi-actions button {
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 18px;
+}
+
+.master-expedisi-content {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 28px 0 60px;
+}
+
+.master-expedisi-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 16px;
+}
+
+.master-expedisi-panel {
+  border: 1px solid #e1e6f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(20, 42, 90, 0.05);
+  padding: 18px;
+}
+
+.master-expedisi-panel h2 {
+  margin: 0 0 10px;
+  color: #172b55;
+}
+
+.master-expedisi-small {
+  margin: 0 0 14px;
+  color: #6f788c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.master-expedisi-form {
+  display: grid;
+  gap: 10px;
+}
+
+.master-expedisi-form label {
+  margin: 0;
+  font-size: 13px;
+}
+
+.master-expedisi-form input,
+.master-expedisi-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cad2e1;
+  border-radius: 10px;
+}
+
+.master-expedisi-form .row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.master-expedisi-form .row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.master-expedisi-form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.master-expedisi-form-actions button {
+  width: auto;
+  min-width: 120px;
+  margin: 0;
+}
+
+.master-expedisi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.master-expedisi-toolbar input {
+  flex: 1;
+  min-width: 240px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cad2e1;
+  border-radius: 10px;
+}
+
+.master-expedisi-table-wrapper {
+  overflow-x: auto;
+}
+
+.master-expedisi-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.master-expedisi-table th,
+.master-expedisi-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eceff4;
+  text-align: left;
+  vertical-align: top;
+}
+
+.master-expedisi-table th {
+  color: #6f788c;
+  font-size: 12px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.master-expedisi-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.master-expedisi-pill-active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.master-expedisi-pill-inactive {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.master-expedisi-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.master-expedisi-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #315ee8;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.master-expedisi-danger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #dc2626;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .master-expedisi-header {
+    flex-direction: column;
+  }
+  .master-expedisi-grid {
+    grid-template-columns: 1fr;
+  }
+  .master-expedisi-form .row-2,
+  .master-expedisi-form .row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Modal Konfirmasi Hapus ── */
+.master-expedisi-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.master-expedisi-confirm-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.master-expedisi-confirm-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: #1a202c;
+}
+
+.master-expedisi-confirm-dialog p {
+  margin: 0 0 8px;
+  color: #4a5568;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.master-expedisi-confirm-info {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.master-expedisi-confirm-info p {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.master-expedisi-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
