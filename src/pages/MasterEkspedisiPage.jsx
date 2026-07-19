@@ -172,15 +172,10 @@ function MasterEkspedisiPage({
     }
 
     // Prefix wajib untuk match_type = PREFIX
-    // Untuk EXACT, prefix boleh kosong (opsional)
     if (form.match_type === 'PREFIX' && !prefix) {
       return 'Prefix wajib diisi untuk Match Type PREFIX.'
     }
-
-    // Untuk EXACT, kalau prefix diisi berarti jadi nomor resi exact
-    if (form.match_type === 'EXACT' && !prefix) {
-      return 'Untuk Match Type EXACT, isi Prefix dengan nomor resi lengkap yang harus cocok persis.'
-    }
+    // Untuk EXACT, prefix opsional (bisa kosong)
 
     const minLen = toInt(form.min_length, 0)
     const maxLen = toInt(form.max_length, 0)
