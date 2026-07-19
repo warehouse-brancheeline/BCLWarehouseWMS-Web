@@ -5,6 +5,7 @@ import {
   useState,
 } from 'react'
 import './App.css'
+import ErrorBoundary from './lib/ErrorBoundary'
 import {
   supabase,
   supabaseConfigError,
@@ -208,7 +209,8 @@ function App() {
 
   if (session) {
     return (
-      <Suspense fallback={<PageLoading message="Memuat halaman..." />}>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoading message="Memuat halaman..." />}>
         {currentPage === 'bin-to-bin' ? (
           <BinToBinPage
             session={session}
@@ -284,7 +286,8 @@ function App() {
             onOpenMasterEkspedisi={() => setCurrentPage('master-ekspedisi')}
           />
         )}
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     )
   }
 

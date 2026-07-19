@@ -61,6 +61,8 @@ function CancelledShipmentsPage({
   const [updatingId, setUpdatingId] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState(null)
+  // confirmTarget = { row, nextStatus } | null
 
   const trackingNumbers = useMemo(
     () => parseTrackingNumbers(trackingInput),
@@ -202,18 +204,15 @@ function CancelledShipmentsPage({
     setSubmitting(false)
   }
 
-  const updateCancelStatus = async (row, nextStatus) => {
-    const isRevoking = nextStatus === 'REVOKED'
+  const requestUpdateCancel = (row, nextStatus) => {
+    setConfirmTarget({ row, nextStatus })
+  }
 
-    const confirmationMessage = isRevoking
-      ? `Cabut status cancel untuk resi ${row.tracking_number}? Resi dapat diproses kembali di aplikasi.`
-      : `Aktifkan kembali status cancel untuk resi ${row.tracking_number}?`
+  const executeUpdateCancel = async () => {
+    if (!confirmTarget) return
 
-    const confirmed = window.confirm(confirmationMessage)
-    if (!confirmed) {
-      return
-    }
-
+    const { row, nextStatus } = confirmTarget
+    setConfirmTarget(null)
     setUpdatingId(row.id)
     setError('')
     setSuccess('')
@@ -537,7 +536,7 @@ function CancelledShipmentsPage({
                             className="table-action table-action-revoke"
                             type="button"
                             disabled={updatingId === row.id}
-                            onClick={() => updateCancelStatus(row, 'REVOKED')}
+                            onClick={() => requestUpdateCancel(row, 'REVOKED')}
                           >
                             {updatingId === row.id
                               ? 'Memproses...'
@@ -548,7 +547,7 @@ function CancelledShipmentsPage({
                             className="table-action table-action-activate"
                             type="button"
                             disabled={updatingId === row.id}
-                            onClick={() => updateCancelStatus(row, 'ACTIVE')}
+                            onClick={() => requestUpdateCancel(row, 'ACTIVE')}
                           >
                             {updatingId === row.id
                               ? 'Memproses...'
@@ -569,6 +568,47 @@ function CancelledShipmentsPage({
           </p>
         </section>
       </section>
+      {/* Modal Konfirmasi */}
+      {confirmTarget ? (
+        <div
+          className="cancel-confirm-backdrop"
+          role="presentation"
+          onClick={() => setConfirmTarget(null)}
+        >
+          <section
+            className="cancel-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2>Konfirmasi Tindakan</h2>
+
+            <p>
+              {confirmTarget.nextStatus === 'REVOKED'
+                ? `Cabut status cancel untuk resi ${confirmTarget.row.tracking_number}? Resi dapat diproses kembali di aplikasi.`
+                : `Aktifkan kembali status cancel untuk resi ${confirmTarget.row.tracking_number}?`}
+            </p>
+
+            <div className="cancel-confirm-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setConfirmTarget(null)}
+              >
+                Batal
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                onClick={executeUpdateCancel}
+              >
+                Ya, Lanjutkan
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   )
 }

@@ -45,6 +45,7 @@ function MasterEkspedisiPage({
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(INITIAL_FORM)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const resetForm = useCallback(() => {
     setEditingId(null)
@@ -279,19 +280,17 @@ function MasterEkspedisiPage({
     }
   }
 
-  const deleteRule = async (rule) => {
-    if (!supabase) {
+  const requestDelete = (rule) => {
+    setDeleteTarget(rule)
+  }
+
+  const executeDelete = async () => {
+    if (!deleteTarget || !supabase) {
       return
     }
 
-    const ok = window.confirm(
-      `Hapus rule ini?\n\nCourier: ${rule.courier_code}\nPrefix: ${rule.prefix}\n\nIni akan menghapus data permanen.`,
-    )
-
-    if (!ok) {
-      return
-    }
-
+    const rule = deleteTarget
+    setDeleteTarget(null)
     setError('')
     setSuccess('')
 
@@ -607,7 +606,7 @@ function MasterEkspedisiPage({
                           <button
                             className="master-expedisi-danger"
                             type="button"
-                            onClick={() => deleteRule(r)}
+                            onClick={() => requestDelete(r)}
                           >
                             Hapus
                           </button>
@@ -631,6 +630,51 @@ function MasterEkspedisiPage({
           </section>
         </div>
       </section>
+      {/* Modal Konfirmasi Hapus */}
+      {deleteTarget ? (
+        <div
+          className="master-expedisi-confirm-backdrop"
+          role="presentation"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <section
+            className="master-expedisi-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2>Konfirmasi Hapus Rule</h2>
+
+            <p>
+              Hapus rule ini? Data akan dihapus permanen.
+            </p>
+
+            <div className="master-expedisi-confirm-info">
+              <p><strong>Courier:</strong> {deleteTarget.courier_code}</p>
+              <p><strong>Prefix:</strong> {deleteTarget.prefix}</p>
+            </div>
+
+            <div className="master-expedisi-confirm-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Batal
+              </button>
+
+              <button
+                className="master-expedisi-danger"
+                type="button"
+                onClick={executeDelete}
+                style={{ padding: '8px 20px' }}
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   )
 }
