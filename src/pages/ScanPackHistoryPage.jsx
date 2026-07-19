@@ -12,6 +12,7 @@ import {
   createWorkbook,
   downloadWorkbook,
 } from '../lib/excel'
+import { ToastContainer, useToast } from '../lib/Toast'
 import './ScanPackHistoryPage.css'
 
 function getSourceLabel(value) {
@@ -42,7 +43,7 @@ function ScanPackHistoryPage({
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
-  const [toast, setToast] = useState('')
+  const { toasts, toast, toastSuccess, toastError, dismissToast } = useToast(3000)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancellingItemId, setCancellingItemId] = useState(null)
   const [downloading, setDownloading] = useState(false)
@@ -99,7 +100,7 @@ function ScanPackHistoryPage({
 
   useEffect(() => {
     if (!toast) return undefined
-    const timer = window.setTimeout(() => setToast(''), 3000)
+    const timer = window.setTimeout(() => toast(''), 3000)
     return () => window.clearTimeout(timer)
   }, [toast])
 
@@ -196,10 +197,10 @@ function ScanPackHistoryPage({
       })
 
       setCancelTarget(null)
-      setToast('Order berhasil ditandai cancel.')
+      toastSuccess('Order berhasil ditandai cancel.')
     } catch (cancelError) {
       console.error('Gagal menandai order cancel:', cancelError)
-      setToast('Gagal menandai order cancel. Silakan coba kembali.')
+      toastError('Gagal menandai order cancel. Silakan coba kembali.')
     } finally {
       setCancellingItemId(null)
     }
@@ -224,7 +225,7 @@ function ScanPackHistoryPage({
       await downloadWorkbook(workbook, 'History_Packing.xlsx')
     } catch (err) {
       console.error('Gagal download Excel:', err)
-      setToast('Gagal mengunduh Excel.')
+      toastError('Gagal mengunduh Excel.')
     } finally {
       setDownloading(false)
     }
@@ -252,7 +253,7 @@ function ScanPackHistoryPage({
       )
     } catch (err) {
       console.error('Gagal download Excel:', err)
-      setToast('Gagal mengunduh Excel.')
+      toastError('Gagal mengunduh Excel.')
     } finally {
       setDownloading(false)
     }
@@ -496,7 +497,7 @@ function ScanPackHistoryPage({
           </div>
         ) : null}
 
-        {toast ? <div className="sph-toast">{toast}</div> : null}
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </main>
     )
   }
@@ -675,7 +676,7 @@ function ScanPackHistoryPage({
         ) : null}
       </section>
 
-      {toast ? <div className="sph-toast">{toast}</div> : null}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </main>
   )
 }

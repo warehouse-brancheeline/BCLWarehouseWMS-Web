@@ -18,6 +18,7 @@ import {
   safeFilename,
   toNumber,
 } from '../lib/utils'
+import { ToastContainer, useToast } from '../lib/Toast'
 import './HandoverPage.css'
 
 function getStatusLabel(status) {
@@ -139,7 +140,7 @@ function HandoverPage({
   const [dateValidationError, setDateValidationError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState('')
+  const { toasts, toast, toastSuccess, toastError, dismissToast } = useToast(3000)
   const [previewImage, setPreviewImage] = useState(null)
   const [photoLoadError, setPhotoLoadError] = useState(false)
   const [signatureLoadError, setSignatureLoadError] = useState(false)
@@ -307,7 +308,7 @@ function HandoverPage({
     }
 
     const timer = window.setTimeout(() => {
-      setToast('')
+      toast('')
     }, 2400)
 
     return () => window.clearTimeout(timer)
@@ -526,10 +527,10 @@ function HandoverPage({
 
     try {
       await navigator.clipboard.writeText(trackingNumber)
-      setToast('Nomor resi berhasil disalin.')
+      toastSuccess('Nomor resi berhasil disalin.')
     } catch (copyError) {
       console.error('Gagal menyalin resi:', copyError)
-      setToast('Gagal menyalin nomor resi.')
+      toastError('Gagal menyalin nomor resi.')
     }
   }
 
@@ -595,7 +596,7 @@ function HandoverPage({
       )
 
       setCancelTarget(null)
-      setToast('Order berhasil ditandai cancel.')
+      toastSuccess('Order berhasil ditandai cancel.')
     } catch (cancelError) {
       console.error(
         'Gagal menandai order cancel:',
@@ -669,7 +670,7 @@ function HandoverPage({
     ).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}.xlsx`
 
     await downloadWorkbook(workbook, fileName)
-    setToast('File Excel berhasil diunduh.')
+    toastSuccess('File Excel berhasil diunduh.')
   }
 
   const handleDownloadDetailExcel = async () => {
@@ -759,7 +760,7 @@ function HandoverPage({
     )}.xlsx`
 
     await downloadWorkbook(workbook, fileName)
-    setToast('File Excel detail berhasil diunduh.')
+    toastSuccess('File Excel detail berhasil diunduh.')
   }
 
   const renderListView = () => (
@@ -1698,9 +1699,7 @@ function HandoverPage({
     <main className="handover-page">
       {selectedGroup ? renderDetailView() : renderListView()}
 
-      {toast ? (
-        <div className="handover-toast">{toast}</div>
-      ) : null}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {cancelTarget ? (
         <div
