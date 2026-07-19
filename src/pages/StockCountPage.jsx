@@ -18,6 +18,8 @@ import {
   safeFilename,
   toNumber,
 } from '../lib/utils'
+import Pagination from '../lib/Pagination'
+import { usePagination } from '../lib/usePagination'
 import './StockCountPage.css'
 
 function normalizeStatus(value) {
@@ -480,6 +482,13 @@ function StockCountPage({
       ),
     )
   }, [sessions, search])
+
+  const pagination = usePagination(filteredSessions, 25)
+
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value)
+    pagination.resetPage()
+  }
 
   const selectedSession = useMemo(
     () =>
@@ -1076,7 +1085,7 @@ function StockCountPage({
               type="search"
               value={search}
               placeholder="Cari transaksi, staff, atau status"
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={handleSearchChange}
             />
 
             <button
@@ -1119,14 +1128,14 @@ function StockCountPage({
                       Memuat transaksi Stock Count...
                     </td>
                   </tr>
-                ) : filteredSessions.length === 0 ? (
+                ) : pagination.totalItems === 0 ? (
                   <tr>
                     <td className="stock-empty-table" colSpan="8">
                       Belum ada transaksi Stock Count.
                     </td>
                   </tr>
                 ) : (
-                  filteredSessions.map((session) => (
+                  pagination.paginatedData.map((session) => (
                     <tr key={session.id}>
                       <td>{formatDate(session.createdAt)}</td>
                       <td>
@@ -1178,6 +1187,8 @@ function StockCountPage({
             </table>
           </div>
         </div>
+
+        <Pagination {...pagination} />
       </section>
     </main>
   )

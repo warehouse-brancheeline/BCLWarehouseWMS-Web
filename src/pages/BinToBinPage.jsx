@@ -17,6 +17,8 @@ import {
   safeFilename,
   toNumber,
 } from '../lib/utils'
+import Pagination from '../lib/Pagination'
+import { usePagination } from '../lib/usePagination'
 import './BinToBinPage.css'
 
 function normalizeProcessStatus(value) {
@@ -618,6 +620,14 @@ function BinToBinPage({
     )
   }, [transactions, search])
 
+  const pagination = usePagination(filteredTransactions, 25)
+
+  // Reset page saat search berubah
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value)
+    pagination.resetPage()
+  }
+
   const summary = useMemo(() => {
     const totalStaff = new Set(
       transactions
@@ -1177,7 +1187,7 @@ function BinToBinPage({
                   type="search"
                   value={search}
                   placeholder="Cari transaksi"
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={handleSearchChange}
                 />
               </div>
             </div>
@@ -1212,14 +1222,14 @@ function BinToBinPage({
                           Memuat transaksi Bin to Bin...
                         </td>
                       </tr>
-                    ) : filteredTransactions.length === 0 ? (
+                    ) : pagination.totalItems === 0 ? (
                       <tr>
                         <td className="bbt-empty-table" colSpan="9">
                           Belum ada transaksi Bin to Bin.
                         </td>
                       </tr>
                     ) : (
-                      filteredTransactions.map((transaction) => (
+                      pagination.paginatedData.map((transaction) => (
                         <tr key={transaction.id}>
                           <td>{formatDate(transaction.createdAt)}</td>
                           <td>
@@ -1273,6 +1283,7 @@ function BinToBinPage({
                 </table>
               </div>
             </div>
+            <Pagination {...pagination} />
           </>
         )}
       </section>
