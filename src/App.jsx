@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react'
 import {
-  BrowserRouter,
+  HashRouter,
   Navigate,
   Route,
   Routes,
@@ -492,20 +492,14 @@ function App() {
   }
 
   return (
-    <BrowserRouter
-      basename={
-        import.meta.env.GITHUB_ACTIONS
-          ? '/BCLWarehouseWMS-Web/'
-          : '/'
-      }
-    >
+    <HashRouter>
       <AppRoutes
         session={session}
         initializing={initializing}
         profile={profile}
         profileLoading={profileLoading}
       />
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 
