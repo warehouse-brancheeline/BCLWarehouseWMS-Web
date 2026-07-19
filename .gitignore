@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 
 .env.local
+
+# Temporary review/debug files
+PROJECT_REVIEW_CONTEXT.txt
+collect-review-context.sh
+project.zip
+review_part_*
+*.bak
+*.backup-*

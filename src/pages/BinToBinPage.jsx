@@ -5,9 +5,10 @@ import {
   useState,
 } from 'react'
 import {
-  utils,
-  writeFileXLSX,
-} from 'xlsx'
+  addAoaSheet,
+  createWorkbook,
+  downloadWorkbook,
+} from '../lib/excel'
 import { supabase } from '../lib/supabase'
 import {
   formatDate,
@@ -730,14 +731,14 @@ function BinToBinPage({
     })
   }
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (!selectedTransfer) {
       return
     }
 
     const fileName = `Bin_To_Bin_${safeFilename(selectedTransfer.transferNumber)}.xlsx`
 
-    const summarySheet = utils.aoa_to_sheet([
+    const summaryRows = [
       ['BCL Warehouse WMS'],
       ['Laporan Bin to Bin'],
       [],
@@ -762,7 +763,7 @@ function BinToBinPage({
       ['Total Baris', selectedTransfer.totalRows],
       ['Total Qty', formatQty(selectedTransfer.totalQty)],
       ['Catatan Transaksi', selectedTransfer.notes || '-'],
-    ])
+    ]
 
     const detailRows = selectedTransfer.detailRows.map((item, index) => [
       index + 1,
@@ -775,21 +776,29 @@ function BinToBinPage({
       formatDate(item.createdAt),
     ])
 
-    const detailSheet = utils.aoa_to_sheet([
-      [
-        'No',
-        'SKU',
-        'Deskripsi',
-        'Qty',
-        'Lokasi Asal',
-        'Lokasi Tujuan',
-        'Catatan',
-        'Waktu Input',
-      ],
+    const detailRowsWithHeader = [
+      ['No', 'SKU', 'Deskripsi', 'Qty', 'Lokasi Asal', 'Lokasi Tujuan', 'Catatan', 'Waktu Input'],
       ...detailRows,
-    ])
+    ]
 
-    summarySheet['!cols'] = [{ width: 28 }, { width: 38 }]
+    const workbook = await createWorkbook()
+
+    const summarySheet = await addAoaSheet(
+      workbook,
+      summaryRows,
+      'Ringkasan',
+    )
+
+    const detailSheet = await addAoaSheet(
+      workbook,
+      detailRowsWithHeader,
+      'Detail Bin to Bin',
+    )
+
+    summarySheet['!cols'] = [
+      { width: 28 },
+      { width: 38 },
+    ]
 
     detailSheet['!cols'] = [
       { width: 8 },
@@ -802,10 +811,7 @@ function BinToBinPage({
       { width: 24 },
     ]
 
-    const workbook = utils.book_new()
-    utils.book_append_sheet(workbook, summarySheet, 'Ringkasan')
-    utils.book_append_sheet(workbook, detailSheet, 'Detail Bin to Bin')
-    writeFileXLSX(workbook, fileName)
+    await downloadWorkbook(workbook, fileName)
   }
 
   return (

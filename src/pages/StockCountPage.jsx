@@ -5,9 +5,11 @@ import {
   useState,
 } from 'react'
 import {
-  utils,
-  writeFileXLSX,
-} from 'xlsx'
+  addAoaSheet,
+  addJsonSheet,
+  createWorkbook,
+  downloadWorkbook,
+} from '../lib/excel'
 import { supabase } from '../lib/supabase'
 import {
   formatDate,
@@ -600,7 +602,7 @@ function StockCountPage({
     }
   }, [confirmAction, selectedSession, currentUserName, loadData])
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     if (!selectedSession) {
       return
     }
@@ -660,9 +662,13 @@ function StockCountPage({
       'Waktu Input': formatDate(item.createdAt),
     }))
 
-    const workbook = utils.book_new()
-    const summarySheet = utils.aoa_to_sheet(summaryRows)
-    const detailSheet = utils.json_to_sheet(detailRows)
+    const workbook = await createWorkbook()
+    const summarySheet = await addAoaSheet(workbook, summaryRows, 'Ringkasan')
+    const detailSheet = await addJsonSheet(
+      workbook,
+      detailRows,
+      'Detail Stock Count',
+    )
 
     summarySheet['!cols'] = [{ wch: 24 }, { wch: 35 }]
     detailSheet['!cols'] = [
@@ -677,14 +683,11 @@ function StockCountPage({
       { wch: 22 },
     ]
 
-    utils.book_append_sheet(workbook, summarySheet, 'Ringkasan')
-    utils.book_append_sheet(workbook, detailSheet, 'Detail Stock Count')
-
     const filename = `Stock_Count_${safeFilename(
       selectedSession.transactionNumber,
     )}.xlsx`
 
-    writeFileXLSX(workbook, filename, { compression: true })
+    await downloadWorkbook(workbook, filename, { compression: true })
   }
 
   if (selectedSession) {

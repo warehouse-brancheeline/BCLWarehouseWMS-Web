@@ -5,9 +5,10 @@ import {
   useState,
 } from 'react'
 import {
-  utils,
-  writeFileXLSX,
-} from 'xlsx'
+  addJsonSheet,
+  createWorkbook,
+  downloadWorkbook,
+} from '../lib/excel'
 import { supabase } from '../lib/supabase'
 import { useCurrentUser } from '../lib/useCurrentUser'
 import {
@@ -609,8 +610,8 @@ function HandoverPage({
     }
   }
 
-  const handleDownloadListExcel = () => {
-    const workbook = utils.book_new()
+  const handleDownloadListExcel = async () => {
+    const workbook = await createWorkbook()
 
     const summaryRows = filteredGroups.map((group) => ({
       'Nomor Group': group.group_number || '-',
@@ -657,19 +658,8 @@ function HandoverPage({
       })),
     )
 
-    const summarySheet = utils.json_to_sheet(summaryRows)
-    const detailSheet = utils.json_to_sheet(detailRows)
-
-    utils.book_append_sheet(
-      workbook,
-      summarySheet,
-      'Summary Handover',
-    )
-    utils.book_append_sheet(
-      workbook,
-      detailSheet,
-      'Detail Resi',
-    )
+    await addJsonSheet(workbook, summaryRows, 'Summary Handover')
+    await addJsonSheet(workbook, detailRows, 'Detail Resi')
 
     const stamp = new Date()
     const fileName = `Handover_${stamp.getFullYear()}${String(
@@ -678,16 +668,16 @@ function HandoverPage({
       stamp.getHours(),
     ).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}.xlsx`
 
-    writeFileXLSX(workbook, fileName)
+    await downloadWorkbook(workbook, fileName)
     setToast('File Excel berhasil diunduh.')
   }
 
-  const handleDownloadDetailExcel = () => {
+  const handleDownloadDetailExcel = async () => {
     if (!selectedGroup) {
       return
     }
 
-    const workbook = utils.book_new()
+    const workbook = await createWorkbook()
 
     const groupSummaryRows = [
       {
@@ -759,20 +749,16 @@ function HandoverPage({
       },
     ]
 
-    const summarySheet = utils.json_to_sheet(groupSummaryRows)
-    const itemsSheet = utils.json_to_sheet(itemsRows)
-    const proofSheet = utils.json_to_sheet(proofRows)
-
-    utils.book_append_sheet(workbook, summarySheet, 'Group Summary')
-    utils.book_append_sheet(workbook, itemsSheet, 'Daftar Resi')
-    utils.book_append_sheet(workbook, proofSheet, 'Bukti Handover')
+    await addJsonSheet(workbook, groupSummaryRows, 'Group Summary')
+    await addJsonSheet(workbook, itemsRows, 'Daftar Resi')
+    await addJsonSheet(workbook, proofRows, 'Bukti Handover')
 
     const fileName = `${safeFilename(
       selectedGroup.group_number || 'group',
       'group',
     )}.xlsx`
 
-    writeFileXLSX(workbook, fileName)
+    await downloadWorkbook(workbook, fileName)
     setToast('File Excel detail berhasil diunduh.')
   }
 

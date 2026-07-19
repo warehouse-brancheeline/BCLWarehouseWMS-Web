@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useEffect,
   useState,
 } from 'react'
@@ -7,15 +9,27 @@ import {
   supabase,
   supabaseConfigError,
 } from './lib/supabase'
-import BinToBinPage from './pages/BinToBinPage'
-import CancelledShipmentsPage from './pages/CancelledShipmentsPage'
-import DashboardPage from './pages/DashboardPage'
-import HandoverPage from './pages/HandoverPage'
-import ScanPackPage from './pages/ScanPackPage'
-import ScanPackHistoryPage from './pages/ScanPackHistoryPage'
-import StockCountPage from './pages/StockCountPage'
-import UserManagementPage from './pages/UserManagementPage'
-import MasterEkspedisiPage from './pages/MasterEkspedisiPage'
+
+const BinToBinPage = lazy(() => import('./pages/BinToBinPage'))
+const CancelledShipmentsPage = lazy(() => import('./pages/CancelledShipmentsPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const HandoverPage = lazy(() => import('./pages/HandoverPage'))
+const ScanPackPage = lazy(() => import('./pages/ScanPackPage'))
+const ScanPackHistoryPage = lazy(() => import('./pages/ScanPackHistoryPage'))
+const StockCountPage = lazy(() => import('./pages/StockCountPage'))
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage'))
+const MasterEkspedisiPage = lazy(() => import('./pages/MasterEkspedisiPage'))
+
+function PageLoading({ message = 'Memuat halaman...' }) {
+  return (
+    <main className="page-center">
+      <section className="message-card">
+        <div className="spinner" />
+        <p>{message}</p>
+      </section>
+    </main>
+  )
+}
 
 function App() {
   const [session, setSession] = useState(null)
@@ -29,7 +43,6 @@ function App() {
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
-  // ─── Restore session on mount ───────────────────────────────
   useEffect(() => {
     if (!supabase) {
       setInitializing(false)
@@ -70,7 +83,6 @@ function App() {
     }
   }, [])
 
-  // ─── Load profile setiap session berubah ────────────────────
   useEffect(() => {
     let active = true
 
@@ -119,17 +131,15 @@ function App() {
     }
   }, [session])
 
-  // ─── Computed: apakah user adalah admin aktif ────────────────
   const isAdmin =
     profile?.role === 'admin' &&
     profile?.is_active === true
 
-  // ─── Computed: apakah user adalah admin atau admin_warehouse ─
   const isAdminOrWarehouse =
-    (profile?.role === 'admin' || profile?.role === 'admin_warehouse') &&
+    (profile?.role === 'admin' ||
+      profile?.role === 'admin_warehouse') &&
     profile?.is_active === true
 
-  // ─── Login ───────────────────────────────────────────────────
   const handleLogin = async (event) => {
     event.preventDefault()
 
@@ -146,10 +156,11 @@ function App() {
     setLoading(true)
     setError('')
 
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
+    const { error: loginError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
 
     if (loginError) {
       const errorMessage = loginError.message.toLowerCase()
@@ -164,12 +175,12 @@ function App() {
     setLoading(false)
   }
 
-  // ─── Logout ──────────────────────────────────────────────────
   const handleLogout = async () => {
     setLoading(true)
     setError('')
 
-    const { error: logoutError } = await supabase.auth.signOut()
+    const { error: logoutError } =
+      await supabase.auth.signOut()
 
     if (logoutError) {
       setError('Logout gagal.')
@@ -180,7 +191,6 @@ function App() {
     setLoading(false)
   }
 
-  // ─── Guard: Supabase belum dikonfigurasi ─────────────────────
   if (supabaseConfigError) {
     return (
       <main className="page-center">
@@ -192,133 +202,92 @@ function App() {
     )
   }
 
-  // ─── Guard: Masih initializing ───────────────────────────────
   if (initializing) {
-    return (
-      <main className="page-center">
-        <section className="message-card">
-          <div className="spinner" />
-          <p>Memuat BCL Warehouse WMS...</p>
-        </section>
-      </main>
-    )
+    return <PageLoading message="Memuat BCL Warehouse WMS..." />
   }
 
-  // ─── Routing: Halaman setelah login ──────────────────────────
   if (session) {
-    if (currentPage === 'bin-to-bin') {
-      return (
-        <BinToBinPage
-          session={session}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'stock-count') {
-      return (
-        <StockCountPage
-          session={session}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'scan-pack-history') {
-      return (
-        <ScanPackHistoryPage
-          session={session}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('scan-pack')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'cancelled-shipments') {
-      return (
-        <CancelledShipmentsPage
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('scan-pack')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'scan-pack') {
-      return (
-        <ScanPackPage
-          session={session}
-          loadingLogout={loading}
-          onOpenHistory={() => setCurrentPage('scan-pack-history')}
-          onOpenCancelledShipments={() => setCurrentPage('cancelled-shipments')}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'handover') {
-      return (
-        <HandoverPage
-          session={session}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentPage === 'user-management' && isAdmin) {
-      return (
-        <UserManagementPage
-          profile={profile}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    // FIX: MasterEkspedisiPage sekarang bisa diakses dari dashboard
-    if (currentPage === 'master-ekspedisi' && isAdminOrWarehouse) {
-      return (
-        <MasterEkspedisiPage
-          profile={profile}
-          loadingLogout={loading}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    // Default: Dashboard
-    // FIX: isAdmin sekarang dikirim ke DashboardPage
     return (
-      <DashboardPage
-        session={session}
-        loading={loading}
-        error={error}
-        profile={profile}
-        profileLoading={profileLoading}
-        isAdmin={isAdmin}
-        isAdminOrWarehouse={isAdminOrWarehouse}
-        onLogout={handleLogout}
-        onOpenBinToBin={() => setCurrentPage('bin-to-bin')}
-        onOpenStockCount={() => setCurrentPage('stock-count')}
-        onOpenHandover={() => setCurrentPage('handover')}
-        onOpenScanPack={() => setCurrentPage('scan-pack')}
-        onOpenUserManagement={() => setCurrentPage('user-management')}
-        onOpenMasterEkspedisi={() => setCurrentPage('master-ekspedisi')}
-      />
+      <Suspense fallback={<PageLoading message="Memuat halaman..." />}>
+        {currentPage === 'bin-to-bin' ? (
+          <BinToBinPage
+            session={session}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'stock-count' ? (
+          <StockCountPage
+            session={session}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'scan-pack-history' ? (
+          <ScanPackHistoryPage
+            session={session}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('scan-pack')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'cancelled-shipments' ? (
+          <CancelledShipmentsPage
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('scan-pack')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'scan-pack' ? (
+          <ScanPackPage
+            session={session}
+            loadingLogout={loading}
+            onOpenHistory={() => setCurrentPage('scan-pack-history')}
+            onOpenCancelledShipments={() => setCurrentPage('cancelled-shipments')}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'handover' ? (
+          <HandoverPage
+            session={session}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'user-management' && isAdmin ? (
+          <UserManagementPage
+            profile={profile}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : currentPage === 'master-ekspedisi' && isAdminOrWarehouse ? (
+          <MasterEkspedisiPage
+            profile={profile}
+            loadingLogout={loading}
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={handleLogout}
+          />
+        ) : (
+          <DashboardPage
+            session={session}
+            loading={loading}
+            error={error}
+            profile={profile}
+            profileLoading={profileLoading}
+            isAdmin={isAdmin}
+            isAdminOrWarehouse={isAdminOrWarehouse}
+            onLogout={handleLogout}
+            onOpenBinToBin={() => setCurrentPage('bin-to-bin')}
+            onOpenStockCount={() => setCurrentPage('stock-count')}
+            onOpenHandover={() => setCurrentPage('handover')}
+            onOpenScanPack={() => setCurrentPage('scan-pack')}
+            onOpenUserManagement={() => setCurrentPage('user-management')}
+            onOpenMasterEkspedisi={() => setCurrentPage('master-ekspedisi')}
+          />
+        )}
+      </Suspense>
     )
   }
 
-  // ─── Halaman Login ───────────────────────────────────────────
   return (
     <main className="login-page">
       <section className="login-card">
@@ -365,9 +334,9 @@ function App() {
             </button>
           </div>
 
-          {error && (
+          {error ? (
             <div className="error-message">{error}</div>
-          )}
+          ) : null}
 
           <button
             className="primary-button"
