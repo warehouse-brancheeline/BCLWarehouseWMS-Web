@@ -4,23 +4,32 @@ import {
   useEffect,
   useState,
 } from 'react'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from 'react-router-dom'
 import './App.css'
-import ErrorBoundary from './lib/ErrorBoundary'
 import {
   supabase,
   supabaseConfigError,
 } from './lib/supabase'
+import ErrorBoundary from './lib/ErrorBoundary'
 
-const BinToBinPage = lazy(() => import('./pages/BinToBinPage'))
-const CancelledShipmentsPage = lazy(() => import('./pages/CancelledShipmentsPage'))
+// ─── Lazy load semua halaman ────────────────────────────────
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const BinToBinPage = lazy(() => import('./pages/BinToBinPage'))
+const StockCountPage = lazy(() => import('./pages/StockCountPage'))
 const HandoverPage = lazy(() => import('./pages/HandoverPage'))
 const ScanPackPage = lazy(() => import('./pages/ScanPackPage'))
 const ScanPackHistoryPage = lazy(() => import('./pages/ScanPackHistoryPage'))
-const StockCountPage = lazy(() => import('./pages/StockCountPage'))
+const CancelledShipmentsPage = lazy(() => import('./pages/CancelledShipmentsPage'))
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'))
 const MasterEkspedisiPage = lazy(() => import('./pages/MasterEkspedisiPage'))
 
+// ─── Loading fallback ────────────────────────────────────────
 function PageLoading({ message = 'Memuat halaman...' }) {
   return (
     <main className="page-center">
@@ -32,15 +41,360 @@ function PageLoading({ message = 'Memuat halaman...' }) {
   )
 }
 
-function App() {
-  const [session, setSession] = useState(null)
-  const [initializing, setInitializing] = useState(true)
+// ─── Guard: harus login ──────────────────────────────────────
+function RequireAuth({ session, initializing, children }) {
+  if (initializing) {
+    return <PageLoading message="Memuat BCL Warehouse WMS..." />
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />
+  }
+
+  return children
+}
+
+// ─── Guard: harus role tertentu ─────────────────────────────
+function RequireRole({ profile, allowedRoles, children }) {
+  if (!profile) {
+    return <PageLoading message="Memuat profil..." />
+  }
+
+  const hasRole = allowedRoles.includes(profile.role) && profile.is_active === true
+
+  if (!hasRole) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
+// ─── Guard: sudah login → redirect ke dashboard ─────────────
+function RedirectIfLoggedIn({ session, initializing, children }) {
+  if (initializing) {
+    return <PageLoading message="Memuat BCL Warehouse WMS..." />
+  }
+
+  if (session) {
+    return <Navigate to="/" replace />
+  }
+
+  return children
+}
+
+// ─── Halaman Login ───────────────────────────────────────────
+function LoginPage({ onLogin, loading, error }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    onLogin(email, password)
+  }
+
+  return (
+    <main className="login-page">
+      <section className="login-card">
+        <div className="logo-box">BC</div>
+
+        <h1>BCL Warehouse WMS</h1>
+
+        <p className="subtitle">
+          Login untuk membuka dashboard warehouse
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <label htmlFor="email">Email</label>
+
+          <input
+            id="email"
+            type="email"
+            value={email}
+            placeholder="nama@email.com"
+            autoComplete="email"
+            disabled={loading}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+
+          <label htmlFor="password">Password</label>
+
+          <div className="password-wrapper">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              placeholder="Masukkan password"
+              autoComplete="current-password"
+              disabled={loading}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+
+            <button
+              className="show-password"
+              type="button"
+              onClick={() => setShowPassword((c) => !c)}
+            >
+              {showPassword ? 'Sembunyikan' : 'Lihat'}
+            </button>
+          </div>
+
+          {error ? (
+            <div className="error-message">{error}</div>
+          ) : null}
+
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? 'Memproses...' : 'Login'}
+          </button>
+        </form>
+
+        <p className="version">BCL Warehouse WMS v1.0</p>
+      </section>
+    </main>
+  )
+}
+
+// ─── Inner App (pakai hooks router) ─────────────────────────
+function AppRoutes({ session, initializing, profile, profileLoading }) {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [loginError, setLoginError] = useState('')
+
+  const isAdmin =
+    profile?.role === 'admin' && profile?.is_active === true
+
+  const isAdminOrWarehouse =
+    (profile?.role === 'admin' || profile?.role === 'admin_warehouse') &&
+    profile?.is_active === true
+
+  const handleLogin = async (email, password) => {
+    if (!email.trim()) {
+      setLoginError('Email wajib diisi.')
+      return
+    }
+
+    if (!password) {
+      setLoginError('Password wajib diisi.')
+      return
+    }
+
+    setLoading(true)
+    setLoginError('')
+
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
+    if (loginError) {
+      const msg = loginError.message.toLowerCase()
+      setLoginError(
+        msg.includes('invalid login credentials')
+          ? 'Email atau password salah.'
+          : loginError.message,
+      )
+    }
+
+    setLoading(false)
+  }
+
+  const handleLogout = async () => {
+    setLoading(true)
+    await supabase.auth.signOut()
+    navigate('/login', { replace: true })
+    setLoading(false)
+  }
+
+  const commonProps = {
+    session,
+    loadingLogout: loading,
+    onLogout: handleLogout,
+  }
+
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          {/* ── Login ── */}
+          <Route
+            path="/login"
+            element={
+              <RedirectIfLoggedIn
+                session={session}
+                initializing={initializing}
+              >
+                <LoginPage
+                  onLogin={handleLogin}
+                  loading={loading}
+                  error={loginError}
+                />
+              </RedirectIfLoggedIn>
+            }
+          />
+
+          {/* ── Dashboard ── */}
+          <Route
+            path="/"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <DashboardPage
+                  session={session}
+                  loading={loading}
+                  profile={profile}
+                  profileLoading={profileLoading}
+                  isAdmin={isAdmin}
+                  isAdminOrWarehouse={isAdminOrWarehouse}
+                  onLogout={handleLogout}
+                  onOpenBinToBin={() => navigate('/bin-to-bin')}
+                  onOpenStockCount={() => navigate('/stock-count')}
+                  onOpenHandover={() => navigate('/handover')}
+                  onOpenScanPack={() => navigate('/scan-pack')}
+                  onOpenUserManagement={() => navigate('/user-management')}
+                  onOpenMasterEkspedisi={() => navigate('/master-ekspedisi')}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Bin to Bin ── */}
+          <Route
+            path="/bin-to-bin"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <BinToBinPage
+                  {...commonProps}
+                  onBack={() => navigate('/')}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Stock Count ── */}
+          <Route
+            path="/stock-count"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <StockCountPage
+                  {...commonProps}
+                  onBack={() => navigate('/')}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Handover ── */}
+          <Route
+            path="/handover"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <HandoverPage
+                  {...commonProps}
+                  onBack={() => navigate('/')}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Scan Pack ── */}
+          <Route
+            path="/scan-pack"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <ScanPackPage
+                  {...commonProps}
+                  onBack={() => navigate('/')}
+                  onOpenHistory={() => navigate('/scan-pack/history')}
+                  onOpenCancelledShipments={() =>
+                    navigate('/scan-pack/cancelled')
+                  }
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Scan Pack History ── */}
+          <Route
+            path="/scan-pack/history"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <ScanPackHistoryPage
+                  {...commonProps}
+                  onBack={() => navigate('/scan-pack')}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Cancelled Shipments ── */}
+          <Route
+            path="/scan-pack/cancelled"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <CancelledShipmentsPage
+                  loadingLogout={loading}
+                  onBack={() => navigate('/scan-pack')}
+                  onLogout={handleLogout}
+                />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── User Management (Admin only) ── */}
+          <Route
+            path="/user-management"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <RequireRole
+                  profile={profile}
+                  allowedRoles={['admin']}
+                >
+                  <UserManagementPage
+                    profile={profile}
+                    loadingLogout={loading}
+                    onBack={() => navigate('/')}
+                    onLogout={handleLogout}
+                  />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Master Ekspedisi (Admin + Admin Warehouse) ── */}
+          <Route
+            path="/master-ekspedisi"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <RequireRole
+                  profile={profile}
+                  allowedRoles={['admin', 'admin_warehouse']}
+                >
+                  <MasterEkspedisiPage
+                    profile={profile}
+                    loadingLogout={loading}
+                    onBack={() => navigate('/')}
+                    onLogout={handleLogout}
+                  />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+
+          {/* ── 404 → redirect ke dashboard ── */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+
+// ─── Root App ────────────────────────────────────────────────
+function App() {
+  const [session, setSession] = useState(null)
+  const [initializing, setInitializing] = useState(true)
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
@@ -71,10 +425,6 @@ function App() {
       if (active) {
         setSession(currentSession)
         setInitializing(false)
-
-        if (!currentSession) {
-          setCurrentPage('dashboard')
-        }
       }
     })
 
@@ -111,9 +461,7 @@ function App() {
         .eq('id', session.user.id)
         .maybeSingle()
 
-      if (!active) {
-        return
-      }
+      if (!active) return
 
       if (profileError) {
         console.error('Gagal memuat profile:', profileError)
@@ -132,66 +480,6 @@ function App() {
     }
   }, [session])
 
-  const isAdmin =
-    profile?.role === 'admin' &&
-    profile?.is_active === true
-
-  const isAdminOrWarehouse =
-    (profile?.role === 'admin' ||
-      profile?.role === 'admin_warehouse') &&
-    profile?.is_active === true
-
-  const handleLogin = async (event) => {
-    event.preventDefault()
-
-    if (!email.trim()) {
-      setError('Email wajib diisi.')
-      return
-    }
-
-    if (!password) {
-      setError('Password wajib diisi.')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-
-    const { error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
-
-    if (loginError) {
-      const errorMessage = loginError.message.toLowerCase()
-
-      if (errorMessage.includes('invalid login credentials')) {
-        setError('Email atau password salah.')
-      } else {
-        setError(loginError.message)
-      }
-    }
-
-    setLoading(false)
-  }
-
-  const handleLogout = async () => {
-    setLoading(true)
-    setError('')
-
-    const { error: logoutError } =
-      await supabase.auth.signOut()
-
-    if (logoutError) {
-      setError('Logout gagal.')
-    } else {
-      setCurrentPage('dashboard')
-    }
-
-    setLoading(false)
-  }
-
   if (supabaseConfigError) {
     return (
       <main className="page-center">
@@ -203,156 +491,21 @@ function App() {
     )
   }
 
-  if (initializing) {
-    return <PageLoading message="Memuat BCL Warehouse WMS..." />
-  }
-
-  if (session) {
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<PageLoading message="Memuat halaman..." />}>
-        {currentPage === 'bin-to-bin' ? (
-          <BinToBinPage
-            session={session}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'stock-count' ? (
-          <StockCountPage
-            session={session}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'scan-pack-history' ? (
-          <ScanPackHistoryPage
-            session={session}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('scan-pack')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'cancelled-shipments' ? (
-          <CancelledShipmentsPage
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('scan-pack')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'scan-pack' ? (
-          <ScanPackPage
-            session={session}
-            loadingLogout={loading}
-            onOpenHistory={() => setCurrentPage('scan-pack-history')}
-            onOpenCancelledShipments={() => setCurrentPage('cancelled-shipments')}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'handover' ? (
-          <HandoverPage
-            session={session}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'user-management' && isAdmin ? (
-          <UserManagementPage
-            profile={profile}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : currentPage === 'master-ekspedisi' && isAdminOrWarehouse ? (
-          <MasterEkspedisiPage
-            profile={profile}
-            loadingLogout={loading}
-            onBack={() => setCurrentPage('dashboard')}
-            onLogout={handleLogout}
-          />
-        ) : (
-          <DashboardPage
-            session={session}
-            loading={loading}
-            error={error}
-            profile={profile}
-            profileLoading={profileLoading}
-            isAdmin={isAdmin}
-            isAdminOrWarehouse={isAdminOrWarehouse}
-            onLogout={handleLogout}
-            onOpenBinToBin={() => setCurrentPage('bin-to-bin')}
-            onOpenStockCount={() => setCurrentPage('stock-count')}
-            onOpenHandover={() => setCurrentPage('handover')}
-            onOpenScanPack={() => setCurrentPage('scan-pack')}
-            onOpenUserManagement={() => setCurrentPage('user-management')}
-            onOpenMasterEkspedisi={() => setCurrentPage('master-ekspedisi')}
-          />
-        )}
-        </Suspense>
-      </ErrorBoundary>
-    )
-  }
-
   return (
-    <main className="login-page">
-      <section className="login-card">
-        <div className="logo-box">BC</div>
-
-        <h1>BCL Warehouse WMS</h1>
-
-        <p className="subtitle">
-          Login untuk membuka dashboard warehouse
-        </p>
-
-        <form onSubmit={handleLogin}>
-          <label htmlFor="email">Email</label>
-
-          <input
-            id="email"
-            type="email"
-            value={email}
-            placeholder="nama@email.com"
-            autoComplete="email"
-            disabled={loading}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-
-          <label htmlFor="password">Password</label>
-
-          <div className="password-wrapper">
-            <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              placeholder="Masukkan password"
-              autoComplete="current-password"
-              disabled={loading}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-
-            <button
-              className="show-password"
-              type="button"
-              onClick={() => setShowPassword((current) => !current)}
-            >
-              {showPassword ? 'Sembunyikan' : 'Lihat'}
-            </button>
-          </div>
-
-          {error ? (
-            <div className="error-message">{error}</div>
-          ) : null}
-
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? 'Memproses...' : 'Login'}
-          </button>
-        </form>
-
-        <p className="version">BCL Warehouse WMS v1.0</p>
-      </section>
-    </main>
+    <BrowserRouter
+      basename={
+        import.meta.env.GITHUB_ACTIONS
+          ? '/BCLWarehouseWMS-Web/'
+          : '/'
+      }
+    >
+      <AppRoutes
+        session={session}
+        initializing={initializing}
+        profile={profile}
+        profileLoading={profileLoading}
+      />
+    </BrowserRouter>
   )
 }
 
