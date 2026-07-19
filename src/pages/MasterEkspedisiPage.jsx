@@ -171,8 +171,15 @@ function MasterEkspedisiPage({
       return 'Courier Name wajib diisi.'
     }
 
-    if (!prefix) {
-      return 'Prefix wajib diisi.'
+    // Prefix wajib untuk match_type = PREFIX
+    // Untuk EXACT, prefix boleh kosong (opsional)
+    if (form.match_type === 'PREFIX' && !prefix) {
+      return 'Prefix wajib diisi untuk Match Type PREFIX.'
+    }
+
+    // Untuk EXACT, kalau prefix diisi berarti jadi nomor resi exact
+    if (form.match_type === 'EXACT' && !prefix) {
+      return 'Untuk Match Type EXACT, isi Prefix dengan nomor resi lengkap yang harus cocok persis.'
     }
 
     const minLen = toInt(form.min_length, 0)
@@ -446,14 +453,34 @@ function MasterEkspedisiPage({
               </div>
 
               <div>
-                <label>Prefix</label>
+                <label>
+                  {form.match_type === 'EXACT'
+                    ? 'Nomor Resi Lengkap (EXACT)'
+                    : 'Prefix'}
+                </label>
                 <input
                   value={form.prefix}
                   onChange={(e) =>
                     setForm((c) => ({ ...c, prefix: e.target.value }))
                   }
-                  placeholder="Contoh: SPXID / JX / CM / IDS / 306770..."
+                  placeholder={
+                    form.match_type === 'EXACT'
+                      ? 'Contoh: 3067706749039610000 (harus sama persis)'
+                      : 'Contoh: SPXID / JX / CM / IDS'
+                  }
                 />
+                {form.match_type === 'EXACT' ? (
+                  <small
+                    style={{
+                      display: 'block',
+                      marginTop: '4px',
+                      fontSize: '12px',
+                      color: '#6f788c',
+                    }}
+                  >
+                    Nomor resi akan dicocokkan persis (bukan awalannya saja).
+                  </small>
+                ) : null}
               </div>
 
               <div className="row-2">
