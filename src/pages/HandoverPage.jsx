@@ -164,7 +164,7 @@ function HandoverPage({
   const [dateValidationError, setDateValidationError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { toasts, toast, toastSuccess, toastError, dismissToast } = useToast(3000)
+  const { toasts, toastSuccess, toastError, dismissToast } = useToast(3000)
   const [previewImage, setPreviewImage] = useState(null)
   const [photoLoadError, setPhotoLoadError] = useState(false)
   const [signatureLoadError, setSignatureLoadError] = useState(false)
@@ -330,18 +330,6 @@ function HandoverPage({
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  useEffect(() => {
-    if (!toast) {
-      return undefined
-    }
-
-    const timer = window.setTimeout(() => {
-      toast('')
-    }, 2400)
-
-    return () => window.clearTimeout(timer)
-  }, [toast])
 
   useEffect(() => {
     if (
@@ -632,7 +620,7 @@ function HandoverPage({
         cancelError,
       )
 
-      setToast(
+      toastError(
         'Gagal menandai order cancel. Silakan coba kembali.',
       )
     } finally {

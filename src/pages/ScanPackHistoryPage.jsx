@@ -43,7 +43,7 @@ function ScanPackHistoryPage({
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
-  const { toasts, toast, toastSuccess, toastError, dismissToast } = useToast(3000)
+  const { toasts, toastSuccess, toastError, dismissToast } = useToast(3000)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancellingItemId, setCancellingItemId] = useState(null)
   const [downloading, setDownloading] = useState(false)
@@ -97,12 +97,6 @@ function ScanPackHistoryPage({
   useEffect(() => {
     loadTasks('')
   }, [loadTasks])
-
-  useEffect(() => {
-    if (!toast) return undefined
-    const timer = window.setTimeout(() => toast(''), 3000)
-    return () => window.clearTimeout(timer)
-  }, [toast])
 
   const openTask = async (task) => {
     setSelectedTask(task)
