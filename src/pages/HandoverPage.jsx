@@ -21,6 +21,30 @@ import {
 import { ToastContainer, useToast } from '../lib/Toast'
 import './HandoverPage.css'
 
+const SUPABASE_PAGE_SIZE = 1000
+
+async function fetchAllRows(createQuery) {
+  const rows = []
+
+  for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+    const { data, error } = await createQuery().range(
+      from,
+      from + SUPABASE_PAGE_SIZE - 1,
+    )
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    const page = data ?? []
+    rows.push(...page)
+
+    if (page.length < SUPABASE_PAGE_SIZE) {
+      return { data: rows, error: null }
+    }
+  }
+}
+
 function getStatusLabel(status) {
   const normalized = String(status || '')
     .trim()
@@ -179,12 +203,17 @@ function HandoverPage({
           .order('created_at', {
             ascending: false,
           }),
-        supabase
-          .from('handover_items')
-          .select('*')
-          .order('scan_sequence', {
-            ascending: true,
-          }),
+        fetchAllRows(() =>
+          supabase
+            .from('handover_items')
+            .select('*')
+            .order('scan_sequence', {
+              ascending: true,
+            })
+            .order('id', {
+              ascending: true,
+            }),
+        ),
       ])
 
       if (groupsResult.error) {
