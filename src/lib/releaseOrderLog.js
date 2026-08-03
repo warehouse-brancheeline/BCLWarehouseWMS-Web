@@ -57,12 +57,13 @@ async function sheetsFetch(path, options = {}) {
 }
 
 export async function getRecentReleaseOrders(limit = 20) {
-  const range = encodeURIComponent(`${sheetName}!A:C`)
+  const range = encodeURIComponent(`${sheetName}!A:D`)
   const result = await sheetsFetch(`/values/${range}?majorDimension=ROWS`)
   const rows = (result.values || []).slice(1).slice(-limit).reverse().map((row) => ({
     timestamp: row[0] || '',
     trackingNumber: row[1] || '',
     source: row[2] || 'WMS Web',
+    courier: row[3] || '',
   }))
   const allDataRows = (result.values || []).slice(1)
   allDataRows.forEach((row) => {
@@ -72,20 +73,20 @@ export async function getRecentReleaseOrders(limit = 20) {
   return { rows }
 }
 
-export async function saveReleaseOrder({ trackingNumber }) {
+export async function saveReleaseOrder({ trackingNumber, courier }) {
   if (knownTrackingNumbers.has(trackingNumber)) {
     throw new Error(`Resi ${trackingNumber} sudah pernah direlease.`)
   }
   knownTrackingNumbers.add(trackingNumber)
 
-  const appendRange = encodeURIComponent(`${sheetName}!A:C`)
+  const appendRange = encodeURIComponent(`${sheetName}!A:D`)
   try {
     await sheetsFetch(
       `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       {
         method: 'POST',
         body: JSON.stringify({
-          values: [[new Date().toISOString(), trackingNumber, 'WMS Web']],
+          values: [[new Date().toISOString(), trackingNumber, 'WMS Web', courier]],
         }),
       },
     )
