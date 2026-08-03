@@ -23,6 +23,27 @@ const couriers = [
   'SPX Standard',
 ]
 
+function getDateKey(timestamp) {
+  const localizedDate = String(timestamp || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (localizedDate) {
+    const [, day, month, year] = localizedDate
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  }
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'Tanggal tidak diketahui'
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateLabel(dateKey) {
+  if (dateKey === 'Tanggal tidak diketahui') return dateKey
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString('id-ID', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
+
 function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [trackingNumber, setTrackingNumber] = useState('')
   const [pickingList, setPickingList] = useState('')
@@ -31,6 +52,10 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('')
   const [recentRows, setRecentRows] = useState([])
+  const [allRows, setAllRows] = useState([])
+  const [screen, setScreen] = useState('home')
+  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedGroupCourier, setSelectedGroupCourier] = useState('')
   const [googleConnected, setGoogleConnected] = useState(
     () => hasSavedReleaseOrderConnection(),
   )
@@ -52,7 +77,8 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     try {
       const result = await getRecentReleaseOrders(20)
       setRecentRows(result.rows || [])
-      focusScannerInput()
+      setAllRows(result.allRows || [])
+      if (screen === 'scan') focusScannerInput()
     } catch {
       // Scan tetap bisa digunakan walaupun riwayat gagal dimuat.
     }
@@ -72,6 +98,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       setGoogleConnected(true)
       const result = await getRecentReleaseOrders(20)
       setRecentRows(result.rows || [])
+      setAllRows(result.allRows || [])
       setMessageType('success')
       setMessage('Google Sheet terhubung. Scanner siap digunakan.')
       focusScannerInput()
@@ -85,6 +112,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     disconnectReleaseOrderSheet()
     setGoogleConnected(false)
     setRecentRows([])
+    setAllRows([])
     setMessageType('success')
     setMessage('Sambungan lama dilepas. Klik Hubungkan Google Sheet untuk memilih akun kembali.')
   }
@@ -125,7 +153,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     queuedTrackingNumbersRef.current.add(cleanTrackingNumber)
 
     const optimisticRow = {
-      timestamp: new Date().toLocaleString('id-ID'),
+      timestamp: new Date().toISOString(),
       trackingNumber: cleanTrackingNumber,
       source: 'WMS Web',
       courier: selectedCourier,
@@ -136,6 +164,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     setMessageType('success')
     setMessage(`Resi ${cleanTrackingNumber} masuk antrean.`)
     setRecentRows((rows) => [optimisticRow, ...rows].slice(0, 20))
+    setAllRows((rows) => [...rows, optimisticRow])
     setPendingCount((count) => count + 1)
     focusScannerInput()
 
@@ -150,6 +179,9 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
           setRecentRows((rows) => rows.map((row) => (
             row === optimisticRow ? { ...row, rowNumber: result.rowNumber } : row
           )))
+          setAllRows((rows) => rows.map((row) => (
+            row === optimisticRow ? { ...row, rowNumber: result.rowNumber } : row
+          )))
         }
         setMessageType('success')
         setMessage(result.message || `Resi ${cleanTrackingNumber} berhasil dicatat.`)
@@ -158,6 +190,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
         setRecentRows((rows) => rows.filter(
           (row) => row !== optimisticRow,
         ))
+        setAllRows((rows) => rows.filter((row) => row !== optimisticRow))
         setMessageType('error')
         setMessage(error.message)
       })
@@ -220,6 +253,35 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     }
   }
 
+  const dateGroups = [...new Set(allRows.map((row) => getDateKey(row.timestamp)))]
+    .sort((a, b) => b.localeCompare(a))
+    .map((date) => ({
+      date,
+      count: allRows.filter((row) => getDateKey(row.timestamp) === date).length,
+    }))
+
+  const rowsForSelectedDate = allRows.filter(
+    (row) => getDateKey(row.timestamp) === selectedDate,
+  )
+  const courierGroups = [...new Set(rowsForSelectedDate.map((row) => row.courier || '-'))]
+    .sort()
+    .map((courier) => ({
+      courier,
+      count: rowsForSelectedDate.filter((row) => (row.courier || '-') === courier).length,
+    }))
+  const visibleRows = screen === 'detail'
+    ? rowsForSelectedDate
+      .filter((row) => (row.courier || '-') === selectedGroupCourier)
+      .slice()
+      .reverse()
+    : recentRows
+
+  const handlePageBack = () => {
+    if (screen === 'detail') setScreen('couriers')
+    else if (screen === 'couriers' || screen === 'scan') setScreen('home')
+    else onBack()
+  }
+
   return (
     <main className="release-order-page">
       <header className="release-order-header">
@@ -229,7 +291,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
           <p>Scan resi sebelum order diberikan kepada picker.</p>
         </div>
         <div className="release-order-header-actions">
-          <button className="secondary-button" type="button" onClick={onBack}>Kembali</button>
+          <button className="secondary-button" type="button" onClick={handlePageBack}>Kembali</button>
           <button className="secondary-button" type="button" disabled={loadingLogout} onClick={onLogout}>
             {loadingLogout ? 'Keluar...' : 'Logout'}
           </button>
@@ -237,7 +299,71 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       </header>
 
       <section className="release-order-content">
-        <article className="release-order-scan-card">
+        {screen === 'home' ? (
+          <>
+            <article className="release-order-overview-card">
+              <div>
+                <p className="small-label">RELEASE ORDER</p>
+                <h2>Hasil Scan Release Order</h2>
+                <p>Pilih tanggal untuk melihat hasil scan per ekspedisi.</p>
+              </div>
+              <div className="release-order-overview-actions">
+                {!googleConnected ? (
+                  <button className="release-order-google-button" type="button" onClick={handleConnectGoogle}>
+                    Hubungkan Google Sheet
+                  </button>
+                ) : (
+                  <button className="secondary-button" type="button" onClick={handleChangeGoogleSheet}>
+                    Ganti Google Sheet
+                  </button>
+                )}
+                <button className="primary-button" type="button" disabled={!googleConnected}
+                  onClick={() => {
+                    setScreen('scan')
+                    focusScannerInput()
+                  }}>Buat Baru</button>
+              </div>
+            </article>
+            {message ? <div className={`release-order-message ${messageType}`}>{message}</div> : null}
+            <div className="release-order-group-list">
+              {dateGroups.length ? dateGroups.map((group) => (
+                <button className="release-order-group-card" type="button" key={group.date}
+                  onClick={() => {
+                    setSelectedDate(group.date)
+                    setScreen('couriers')
+                  }}>
+                  <span><strong>{formatDateLabel(group.date)}</strong><small>{group.date}</small></span>
+                  <span className="release-order-count">{group.count} resi</span>
+                </button>
+              )) : (
+                <article className="release-order-empty-card">Belum ada hasil scan release order.</article>
+              )}
+            </div>
+          </>
+        ) : null}
+
+        {screen === 'couriers' ? (
+          <article className="release-order-history-card">
+            <div className="release-order-history-title">
+              <div><p className="small-label">{formatDateLabel(selectedDate)}</p><h2>List Per Ekspedisi</h2></div>
+              <button className="secondary-button" type="button" onClick={loadRecent}>Muat Ulang</button>
+            </div>
+            <div className="release-order-group-list courier-groups">
+              {courierGroups.map((group) => (
+                <button className="release-order-group-card" type="button" key={group.courier}
+                  onClick={() => {
+                    setSelectedGroupCourier(group.courier)
+                    setScreen('detail')
+                  }}>
+                  <strong>{group.courier}</strong>
+                  <span className="release-order-count">{group.count} resi</span>
+                </button>
+              ))}
+            </div>
+          </article>
+        ) : null}
+
+        {screen === 'scan' ? <article className="release-order-scan-card">
           <div className="release-order-step">1</div>
           <div>
             <h2>Scan nomor resi</h2>
@@ -297,18 +423,21 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             <div className="release-order-message error">{releaseOrderLogConfigError}</div>
           ) : null}
           {message ? <div className={`release-order-message ${messageType}`}>{message}</div> : null}
-        </article>
+        </article> : null}
 
-        <article className="release-order-history-card">
+        {screen === 'scan' || screen === 'detail' ? <article className="release-order-history-card">
           <div className="release-order-history-title">
-            <div><p className="small-label">20 SCAN TERBARU</p><h2>Riwayat Release</h2></div>
+            <div>
+              <p className="small-label">{screen === 'detail' ? formatDateLabel(selectedDate) : '20 SCAN TERBARU'}</p>
+              <h2>{screen === 'detail' ? `Detail ${selectedGroupCourier}` : 'Riwayat Release'}</h2>
+            </div>
             <button className="secondary-button" type="button" disabled={!googleConnected} onClick={loadRecent}>Muat Ulang</button>
           </div>
           <div className="release-order-table-wrap">
             <table>
               <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th><th>No. Picking List</th><th>Aksi</th></tr></thead>
               <tbody>
-                {recentRows.length ? recentRows.map((row) => (
+                {visibleRows.length ? visibleRows.map((row) => (
                   <tr key={`${row.timestamp}-${row.trackingNumber}`}>
                     <td>{row.timestamp}</td>
                     <td>
@@ -357,7 +486,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
               </tbody>
             </table>
           </div>
-        </article>
+        </article> : null}
       </section>
     </main>
   )
