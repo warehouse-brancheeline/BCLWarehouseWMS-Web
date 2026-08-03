@@ -20,6 +20,30 @@ const app = getApps()[0] || initializeApp(firebaseConfig)
 const auth = getAuth(app)
 let accessToken = ''
 const knownTrackingNumbers = new Set()
+const tokenStorageKey = 'bcl-release-order-google-token'
+const tokenExpiryStorageKey = 'bcl-release-order-google-token-expiry'
+
+function clearSavedConnection() {
+  accessToken = ''
+  localStorage.removeItem(tokenStorageKey)
+  localStorage.removeItem(tokenExpiryStorageKey)
+}
+
+export function hasSavedReleaseOrderConnection() {
+  const savedToken = localStorage.getItem(tokenStorageKey) || ''
+  const expiresAt = Number(localStorage.getItem(tokenExpiryStorageKey) || 0)
+  if (!savedToken || expiresAt <= Date.now()) {
+    clearSavedConnection()
+    return false
+  }
+  accessToken = savedToken
+  return true
+}
+
+export function disconnectReleaseOrderSheet() {
+  clearSavedConnection()
+  knownTrackingNumbers.clear()
+}
 
 export const releaseOrderLogConfigError = ''
 
@@ -32,6 +56,8 @@ export async function connectReleaseOrderSheet() {
   const credential = GoogleAuthProvider.credentialFromResult(result)
   accessToken = credential?.accessToken || ''
   if (!accessToken) throw new Error('Izin Google Sheets tidak diberikan.')
+  localStorage.setItem(tokenStorageKey, accessToken)
+  localStorage.setItem(tokenExpiryStorageKey, String(Date.now() + (50 * 60 * 1000)))
   return true
 }
 
@@ -47,7 +73,7 @@ async function sheetsFetch(path, options = {}) {
   })
 
   if (response.status === 401) {
-    accessToken = ''
+    clearSavedConnection()
     throw new Error('Sesi Google berakhir. Hubungkan kembali akun Google.')
   }
 
