@@ -9,12 +9,14 @@ import './ReleaseOrderLogPage.css'
 
 function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [trackingNumber, setTrackingNumber] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('')
   const [recentRows, setRecentRows] = useState([])
   const [googleConnected, setGoogleConnected] = useState(false)
   const inputRef = useRef(null)
+  const scanQueueRef = useRef(Promise.resolve())
+  const queuedTrackingNumbersRef = useRef(new Set())
 
   const focusScannerInput = () => {
     window.setTimeout(() => inputRef.current?.focus(), 50)
@@ -49,7 +51,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     }
   }
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault()
     const cleanTrackingNumber = trackingNumber.trim().toUpperCase()
 
@@ -60,23 +62,46 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       return
     }
 
-    setSaving(true)
-    setMessage('')
-    try {
-      const result = await saveReleaseOrder({
-        trackingNumber: cleanTrackingNumber,
-      })
+    if (queuedTrackingNumbersRef.current.has(cleanTrackingNumber)) {
       setTrackingNumber('')
-      setMessageType('success')
-      setMessage(result.message || `Resi ${cleanTrackingNumber} berhasil dicatat.`)
-      await loadRecent()
-    } catch (error) {
       setMessageType('error')
-      setMessage(error.message)
-    } finally {
-      setSaving(false)
+      setMessage(`Resi ${cleanTrackingNumber} sudah masuk antrean.`)
       focusScannerInput()
+      return
     }
+
+    queuedTrackingNumbersRef.current.add(cleanTrackingNumber)
+
+    const optimisticRow = {
+      timestamp: new Date().toLocaleString('id-ID'),
+      trackingNumber: cleanTrackingNumber,
+      source: 'WMS Web',
+    }
+
+    setTrackingNumber('')
+    setMessageType('success')
+    setMessage(`Resi ${cleanTrackingNumber} masuk antrean.`)
+    setRecentRows((rows) => [optimisticRow, ...rows].slice(0, 20))
+    setPendingCount((count) => count + 1)
+    focusScannerInput()
+
+    scanQueueRef.current = scanQueueRef.current
+      .then(() => saveReleaseOrder({ trackingNumber: cleanTrackingNumber }))
+      .then((result) => {
+        setMessageType('success')
+        setMessage(result.message || `Resi ${cleanTrackingNumber} berhasil dicatat.`)
+      })
+      .catch((error) => {
+        setRecentRows((rows) => rows.filter(
+          (row) => row !== optimisticRow,
+        ))
+        setMessageType('error')
+        setMessage(error.message)
+      })
+      .finally(() => {
+        setPendingCount((count) => Math.max(0, count - 1))
+        focusScannerInput()
+      })
   }
 
   return (
@@ -112,14 +137,14 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             <div className="release-order-input-row">
               <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
                 placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
-                disabled={saving || Boolean(releaseOrderLogConfigError) || !googleConnected}
+                disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
                 onChange={(event) => setTrackingNumber(event.target.value)}
                 onBlur={() => {
-                  if (googleConnected && !saving) focusScannerInput()
+                  if (googleConnected) focusScannerInput()
                 }} />
               <button className="primary-button" type="submit"
-                disabled={saving || Boolean(releaseOrderLogConfigError) || !googleConnected}>
-                {saving ? 'Menyimpan...' : 'Catat Resi'}
+                disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}>
+                {pendingCount ? `Antrean ${pendingCount}` : 'Catat Resi'}
               </button>
             </div>
           </form>
