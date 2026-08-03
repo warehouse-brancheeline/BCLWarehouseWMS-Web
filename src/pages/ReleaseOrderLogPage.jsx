@@ -261,12 +261,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                 <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
                   placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
                   disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
-                  onChange={(event) => setTrackingNumber(event.target.value)}
-                  onBlur={(event) => {
-                    const nextElement = event.relatedTarget
-                    const editingHistory = nextElement?.closest?.('.release-order-history-card')
-                    if (googleConnected && !editingHistory) focusScannerInput()
-                  }} />
+                  onChange={(event) => setTrackingNumber(event.target.value)} />
               </div>
               <div className="release-order-field picking-list-field">
                 <label htmlFor="release-order-picking-list">Nomor Picking List</label>
