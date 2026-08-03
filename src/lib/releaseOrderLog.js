@@ -87,7 +87,7 @@ export async function getRecentReleaseOrders(limit = 20) {
   const range = encodeURIComponent(`${sheetName}!A:E`)
   const result = await sheetsFetch(`/values/${range}?majorDimension=ROWS`)
   const allDataRows = (result.values || []).slice(1)
-  const rows = allDataRows
+  const allRows = allDataRows
     .map((row, index) => ({
       rowNumber: index + 2,
       timestamp: row[0] || '',
@@ -97,6 +97,7 @@ export async function getRecentReleaseOrders(limit = 20) {
       pickingList: row[4] || '',
     }))
     .filter((row) => row.trackingNumber)
+  const rows = allRows
     .slice(-limit)
     .reverse()
   allDataRows.forEach((row) => {
@@ -106,7 +107,7 @@ export async function getRecentReleaseOrders(limit = 20) {
   if (allDataRows.length) {
     await formatReleaseOrderRows(2, allDataRows.length + 2)
   }
-  return { rows }
+  return { rows, allRows }
 }
 
 export async function saveReleaseOrder({ trackingNumber, courier, pickingList }) {
