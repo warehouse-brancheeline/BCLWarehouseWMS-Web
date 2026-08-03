@@ -248,8 +248,10 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                 placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
                 disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
                 onChange={(event) => setTrackingNumber(event.target.value)}
-                onBlur={() => {
-                  if (googleConnected) focusScannerInput()
+                onBlur={(event) => {
+                  const nextElement = event.relatedTarget
+                  const editingHistory = nextElement?.closest?.('.release-order-history-card')
+                  if (googleConnected && !editingHistory) focusScannerInput()
                 }} />
               <button className="primary-button" type="submit"
                 disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}>
