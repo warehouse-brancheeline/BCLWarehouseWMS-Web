@@ -20,6 +20,7 @@ function DashboardPage({
   onOpenScanPack,
   onOpenUserManagement,
   onOpenMasterEkspedisi,
+  onOpenReleaseOrderLog,
 }) {
   return (
     <main className="dashboard-page">
@@ -114,15 +115,26 @@ function DashboardPage({
 
           {/* ── Menu khusus Admin saja ── */}
           {isAdmin ? (
-            <button
-              className="menu-card menu-card-button"
-              type="button"
-              onClick={onOpenUserManagement}
-            >
-              <div className="menu-icon">UM</div>
-              <h3>Manajemen User</h3>
-              <p>Daftarkan dan lihat akun pengguna WMS.</p>
-            </button>
+            <>
+              <button
+                className="menu-card menu-card-button"
+                type="button"
+                onClick={onOpenReleaseOrderLog}
+              >
+                <div className="menu-icon">RO</div>
+                <h3>Release Order Log</h3>
+                <p>Scan resi sebelum order diserahkan kepada picker.</p>
+              </button>
+              <button
+                className="menu-card menu-card-button"
+                type="button"
+                onClick={onOpenUserManagement}
+              >
+                <div className="menu-icon">UM</div>
+                <h3>Manajemen User</h3>
+                <p>Daftarkan dan lihat akun pengguna WMS.</p>
+              </button>
+            </>
           ) : null}
         </div>
 
