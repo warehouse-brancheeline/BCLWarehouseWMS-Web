@@ -20,6 +20,7 @@ const app = getApps()[0] || initializeApp(firebaseConfig)
 const auth = getAuth(app)
 let accessToken = ''
 const knownTrackingNumbers = new Set()
+let releaseOrderSheetId = null
 const tokenStorageKey = 'bcl-release-order-google-token'
 const tokenExpiryStorageKey = 'bcl-release-order-google-token-expiry'
 
@@ -85,13 +86,18 @@ async function sheetsFetch(path, options = {}) {
 export async function getRecentReleaseOrders(limit = 20) {
   const range = encodeURIComponent(`${sheetName}!A:D`)
   const result = await sheetsFetch(`/values/${range}?majorDimension=ROWS`)
-  const rows = (result.values || []).slice(1).slice(-limit).reverse().map((row) => ({
-    timestamp: row[0] || '',
-    trackingNumber: row[1] || '',
-    source: row[2] || 'WMS Web',
-    courier: row[3] || '',
-  }))
   const allDataRows = (result.values || []).slice(1)
+  const rows = allDataRows
+    .map((row, index) => ({
+      rowNumber: index + 2,
+      timestamp: row[0] || '',
+      trackingNumber: row[1] || '',
+      source: row[2] || 'WMS Web',
+      courier: row[3] || '',
+    }))
+    .filter((row) => row.trackingNumber)
+    .slice(-limit)
+    .reverse()
   allDataRows.forEach((row) => {
     const trackingNumber = String(row[1] || '').trim().toUpperCase()
     if (trackingNumber) knownTrackingNumbers.add(trackingNumber)
@@ -107,7 +113,7 @@ export async function saveReleaseOrder({ trackingNumber, courier }) {
 
   const appendRange = encodeURIComponent(`${sheetName}!A:D`)
   try {
-    await sheetsFetch(
+    const result = await sheetsFetch(
       `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       {
         method: 'POST',
@@ -116,9 +122,63 @@ export async function saveReleaseOrder({ trackingNumber, courier }) {
         }),
       },
     )
+    const updatedRange = result.updates?.updatedRange || ''
+    const rowNumber = Number(updatedRange.match(/!(?:A|\$A)\$?(\d+)/)?.[1] || 0)
+    return { ok: true, message: `Resi ${trackingNumber} berhasil dicatat.`, rowNumber }
   } catch (error) {
     knownTrackingNumbers.delete(trackingNumber)
     throw error
   }
-  return { ok: true, message: `Resi ${trackingNumber} berhasil dicatat.` }
+}
+
+export async function updateReleaseOrder({ rowNumber, oldTrackingNumber, trackingNumber, courier }) {
+  const normalizedTrackingNumber = String(trackingNumber || '').trim().toUpperCase()
+  if (!normalizedTrackingNumber) throw new Error('Nomor resi wajib diisi.')
+  if (normalizedTrackingNumber !== oldTrackingNumber
+    && knownTrackingNumbers.has(normalizedTrackingNumber)) {
+    throw new Error(`Resi ${normalizedTrackingNumber} sudah pernah direlease.`)
+  }
+
+  const range = encodeURIComponent(`${sheetName}!B${rowNumber}:D${rowNumber}`)
+  await sheetsFetch(`/values/${range}?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      values: [[normalizedTrackingNumber, 'WMS Web', courier]],
+    }),
+  })
+  knownTrackingNumbers.delete(oldTrackingNumber)
+  knownTrackingNumbers.add(normalizedTrackingNumber)
+  return { ok: true, message: `Resi ${normalizedTrackingNumber} berhasil diperbarui.` }
+}
+
+async function getReleaseOrderSheetId() {
+  if (releaseOrderSheetId !== null) return releaseOrderSheetId
+  const result = await sheetsFetch('?fields=sheets.properties(sheetId,title)')
+  const sheet = (result.sheets || []).find(
+    (item) => item.properties?.title === sheetName,
+  )
+  if (!sheet) throw new Error(`Sheet ${sheetName} tidak ditemukan.`)
+  releaseOrderSheetId = sheet.properties.sheetId
+  return releaseOrderSheetId
+}
+
+export async function deleteReleaseOrder({ rowNumber, trackingNumber }) {
+  const sheetId = await getReleaseOrderSheetId()
+  await sheetsFetch(':batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: rowNumber - 1,
+            endIndex: rowNumber,
+          },
+        },
+      }],
+    }),
+  })
+  knownTrackingNumbers.delete(trackingNumber)
+  return { ok: true, message: `Resi ${trackingNumber} berhasil dihapus.` }
 }
