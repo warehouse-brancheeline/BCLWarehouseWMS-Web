@@ -13,6 +13,10 @@
 .release-order-input-row { display: flex; align-items: center; gap: 12px; }
 .release-order-input-row input { min-height: 56px; font-size: 18px; font-weight: 700; letter-spacing: .03em; }
 .release-order-input-row .primary-button { width: auto; min-width: 150px; min-height: 56px; margin: 0; padding: 0 20px; }
+.release-order-couriers { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.courier-button { min-height: 42px; padding: 0 16px; border: 1px solid #ccd5e5; border-radius: 10px; color: #17316b; background: #fff; font-weight: 800; cursor: pointer; }
+.courier-button:hover { border-color: #315ee8; background: #f4f7ff; }
+.courier-button.active { border-color: #315ee8; color: #fff; background: #315ee8; box-shadow: 0 4px 12px rgba(49, 94, 232, .22); }
 .release-order-message { margin-top: 16px; padding: 13px 15px; border-radius: 10px; font-weight: 700; }
 .release-order-message.success { color: #166534; background: #dcfce7; }
 .release-order-message.error { color: #a51f1f; background: #fff1f1; }
@@ -22,4 +26,4 @@
 .release-order-history-card th, .release-order-history-card td { padding: 12px 10px; border-bottom: 1px solid #eceff4; text-align: left; }
 .release-order-history-card th { color: #6f788c; font-size: 12px; text-transform: uppercase; }
 .release-order-empty { color: #7b8496; text-align: center !important; }
-@media (max-width: 700px) { .release-order-header, .release-order-history-title { align-items: stretch; flex-direction: column; } .release-order-header { padding: 20px; } .release-order-header-actions button { flex: 1; } .release-order-scan-card { padding: 22px; } .release-order-step { position: static; margin-bottom: 16px; } .release-order-input-row { align-items: stretch; flex-direction: column; } .release-order-input-row .primary-button { width: 100%; } }
+@media (max-width: 700px) { .release-order-header, .release-order-history-title { align-items: stretch; flex-direction: column; } .release-order-header { padding: 20px; } .release-order-header-actions button { flex: 1; } .release-order-scan-card { padding: 22px; } .release-order-step { position: static; margin-bottom: 16px; } .release-order-input-row { align-items: stretch; flex-direction: column; } .release-order-input-row .primary-button { width: 100%; } .courier-button { flex: 1 1 130px; } }
