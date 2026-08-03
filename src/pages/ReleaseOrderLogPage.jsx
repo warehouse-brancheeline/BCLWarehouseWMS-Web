@@ -3,9 +3,11 @@ import {
   getRecentReleaseOrders,
   connectReleaseOrderSheet,
   disconnectReleaseOrderSheet,
+  deleteReleaseOrder,
   hasSavedReleaseOrderConnection,
   releaseOrderLogConfigError,
   saveReleaseOrder,
+  updateReleaseOrder,
 } from '../lib/releaseOrderLog'
 import './ReleaseOrderLogPage.css'
 
@@ -31,6 +33,10 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [googleConnected, setGoogleConnected] = useState(
     () => hasSavedReleaseOrderConnection(),
   )
+  const [editingRowNumber, setEditingRowNumber] = useState(null)
+  const [editTrackingNumber, setEditTrackingNumber] = useState('')
+  const [editCourier, setEditCourier] = useState('')
+  const [actionBusy, setActionBusy] = useState(false)
   const inputRef = useRef(null)
   const scanQueueRef = useRef(Promise.resolve())
   const queuedTrackingNumbersRef = useRef(new Set())
@@ -129,6 +135,11 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
         courier: selectedCourier,
       }))
       .then((result) => {
+        if (result.rowNumber) {
+          setRecentRows((rows) => rows.map((row) => (
+            row === optimisticRow ? { ...row, rowNumber: result.rowNumber } : row
+          )))
+        }
         setMessageType('success')
         setMessage(result.message || `Resi ${cleanTrackingNumber} berhasil dicatat.`)
       })
@@ -143,6 +154,57 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
         setPendingCount((count) => Math.max(0, count - 1))
         focusScannerInput()
       })
+  }
+
+  const startEditing = (row) => {
+    setEditingRowNumber(row.rowNumber)
+    setEditTrackingNumber(row.trackingNumber)
+    setEditCourier(row.courier)
+  }
+
+  const handleSaveEdit = async (row) => {
+    setActionBusy(true)
+    setMessage('')
+    try {
+      const result = await updateReleaseOrder({
+        rowNumber: row.rowNumber,
+        oldTrackingNumber: row.trackingNumber,
+        trackingNumber: editTrackingNumber,
+        courier: editCourier,
+      })
+      queuedTrackingNumbersRef.current.delete(row.trackingNumber)
+      queuedTrackingNumbersRef.current.add(editTrackingNumber.trim().toUpperCase())
+      setEditingRowNumber(null)
+      setMessageType('success')
+      setMessage(result.message)
+      await loadRecent()
+    } catch (error) {
+      setMessageType('error')
+      setMessage(error.message)
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const handleDelete = async (row) => {
+    if (!window.confirm(`Hapus resi ${row.trackingNumber} dari Google Sheet?`)) return
+    setActionBusy(true)
+    setMessage('')
+    try {
+      const result = await deleteReleaseOrder({
+        rowNumber: row.rowNumber,
+        trackingNumber: row.trackingNumber,
+      })
+      queuedTrackingNumbersRef.current.delete(row.trackingNumber)
+      setMessageType('success')
+      setMessage(result.message)
+      await loadRecent()
+    } catch (error) {
+      setMessageType('error')
+      setMessage(error.message)
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   return (
@@ -225,13 +287,47 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
           </div>
           <div className="release-order-table-wrap">
             <table>
-              <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th></tr></thead>
+              <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th><th>Aksi</th></tr></thead>
               <tbody>
                 {recentRows.length ? recentRows.map((row) => (
                   <tr key={`${row.timestamp}-${row.trackingNumber}`}>
-                    <td>{row.timestamp}</td><td><strong>{row.trackingNumber}</strong></td><td>{row.courier || '-'}</td><td>{row.source}</td>
+                    <td>{row.timestamp}</td>
+                    <td>
+                      {editingRowNumber === row.rowNumber ? (
+                        <input className="release-order-edit-input" value={editTrackingNumber}
+                          onChange={(event) => setEditTrackingNumber(event.target.value.toUpperCase())} />
+                      ) : <strong>{row.trackingNumber}</strong>}
+                    </td>
+                    <td>
+                      {editingRowNumber === row.rowNumber ? (
+                        <select className="release-order-edit-select" value={editCourier}
+                          onChange={(event) => setEditCourier(event.target.value)}>
+                          {couriers.map((courier) => <option key={courier}>{courier}</option>)}
+                        </select>
+                      ) : (row.courier || '-')}
+                    </td>
+                    <td>{row.source}</td>
+                    <td>
+                      <div className="release-order-row-actions">
+                        {editingRowNumber === row.rowNumber ? (
+                          <>
+                            <button type="button" className="row-action save" disabled={actionBusy || !editCourier}
+                              onClick={() => handleSaveEdit(row)}>Simpan</button>
+                            <button type="button" className="row-action" disabled={actionBusy}
+                              onClick={() => setEditingRowNumber(null)}>Batal</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="row-action" disabled={actionBusy || !row.rowNumber}
+                              onClick={() => startEditing(row)}>Edit</button>
+                            <button type="button" className="row-action delete" disabled={actionBusy || !row.rowNumber}
+                              onClick={() => handleDelete(row)}>Hapus</button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                )) : <tr><td colSpan="4" className="release-order-empty">Belum ada data scan.</td></tr>}
+                )) : <tr><td colSpan="5" className="release-order-empty">Belum ada data scan.</td></tr>}
               </tbody>
             </table>
           </div>
