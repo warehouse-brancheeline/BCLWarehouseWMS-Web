@@ -25,6 +25,7 @@ const couriers = [
 
 function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [trackingNumber, setTrackingNumber] = useState('')
+  const [pickingList, setPickingList] = useState('')
   const [selectedCourier, setSelectedCourier] = useState('')
   const [pendingCount, setPendingCount] = useState(0)
   const [message, setMessage] = useState('')
@@ -36,6 +37,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [editingRowNumber, setEditingRowNumber] = useState(null)
   const [editTrackingNumber, setEditTrackingNumber] = useState('')
   const [editCourier, setEditCourier] = useState('')
+  const [editPickingList, setEditPickingList] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
   const inputRef = useRef(null)
   const scanQueueRef = useRef(Promise.resolve())
@@ -105,6 +107,13 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       return
     }
 
+    if (!pickingList.trim()) {
+      setMessageType('error')
+      setMessage('Nomor picking list wajib diisi.')
+      focusScannerInput()
+      return
+    }
+
     if (queuedTrackingNumbersRef.current.has(cleanTrackingNumber)) {
       setTrackingNumber('')
       setMessageType('error')
@@ -120,6 +129,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       trackingNumber: cleanTrackingNumber,
       source: 'WMS Web',
       courier: selectedCourier,
+      pickingList: pickingList.trim().toUpperCase(),
     }
 
     setTrackingNumber('')
@@ -133,6 +143,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       .then(() => saveReleaseOrder({
         trackingNumber: cleanTrackingNumber,
         courier: selectedCourier,
+        pickingList: pickingList.trim().toUpperCase(),
       }))
       .then((result) => {
         if (result.rowNumber) {
@@ -160,6 +171,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     setEditingRowNumber(row.rowNumber)
     setEditTrackingNumber(row.trackingNumber)
     setEditCourier(row.courier)
+    setEditPickingList(row.pickingList || '')
   }
 
   const handleSaveEdit = async (row) => {
@@ -171,6 +183,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
         oldTrackingNumber: row.trackingNumber,
         trackingNumber: editTrackingNumber,
         courier: editCourier,
+        pickingList: editPickingList.trim().toUpperCase(),
       })
       queuedTrackingNumbersRef.current.delete(row.trackingNumber)
       queuedTrackingNumbersRef.current.add(editTrackingNumber.trim().toUpperCase())
@@ -242,17 +255,26 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             )
           ) : null}
           <form onSubmit={handleSubmit}>
-            <label htmlFor="release-order-tracking">Nomor resi</label>
             <div className="release-order-input-row">
-              <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
-                placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
-                disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
-                onChange={(event) => setTrackingNumber(event.target.value)}
-                onBlur={(event) => {
-                  const nextElement = event.relatedTarget
-                  const editingHistory = nextElement?.closest?.('.release-order-history-card')
-                  if (googleConnected && !editingHistory) focusScannerInput()
-                }} />
+              <div className="release-order-field">
+                <label htmlFor="release-order-tracking">Nomor resi</label>
+                <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
+                  placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
+                  disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
+                  onChange={(event) => setTrackingNumber(event.target.value)}
+                  onBlur={(event) => {
+                    const nextElement = event.relatedTarget
+                    const editingHistory = nextElement?.closest?.('.release-order-history-card')
+                    if (googleConnected && !editingHistory) focusScannerInput()
+                  }} />
+              </div>
+              <div className="release-order-field picking-list-field">
+                <label htmlFor="release-order-picking-list">Nomor Picking List</label>
+                <input id="release-order-picking-list" value={pickingList}
+                  placeholder="Masukkan nomor picking list" autoComplete="off"
+                  disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
+                  onChange={(event) => setPickingList(event.target.value.toUpperCase())} />
+              </div>
               <button className="primary-button" type="submit"
                 disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}>
                 {pendingCount ? `Antrean ${pendingCount}` : 'Catat Resi'}
@@ -289,7 +311,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
           </div>
           <div className="release-order-table-wrap">
             <table>
-              <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th><th>Aksi</th></tr></thead>
+              <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th><th>No. Picking List</th><th>Aksi</th></tr></thead>
               <tbody>
                 {recentRows.length ? recentRows.map((row) => (
                   <tr key={`${row.timestamp}-${row.trackingNumber}`}>
@@ -310,10 +332,17 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                     </td>
                     <td>{row.source}</td>
                     <td>
+                      {editingRowNumber === row.rowNumber ? (
+                        <input className="release-order-edit-input" value={editPickingList}
+                          onChange={(event) => setEditPickingList(event.target.value.toUpperCase())} />
+                      ) : (row.pickingList || '-')}
+                    </td>
+                    <td>
                       <div className="release-order-row-actions">
                         {editingRowNumber === row.rowNumber ? (
                           <>
-                            <button type="button" className="row-action save" disabled={actionBusy || !editCourier}
+                            <button type="button" className="row-action save"
+                              disabled={actionBusy || !editCourier || !editPickingList.trim()}
                               onClick={() => handleSaveEdit(row)}>Simpan</button>
                             <button type="button" className="row-action" disabled={actionBusy}
                               onClick={() => setEditingRowNumber(null)}>Batal</button>
@@ -329,7 +358,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                       </div>
                     </td>
                   </tr>
-                )) : <tr><td colSpan="5" className="release-order-empty">Belum ada data scan.</td></tr>}
+                )) : <tr><td colSpan="6" className="release-order-empty">Belum ada data scan.</td></tr>}
               </tbody>
             </table>
           </div>
