@@ -102,6 +102,9 @@ export async function getRecentReleaseOrders(limit = 20) {
     const trackingNumber = String(row[1] || '').trim().toUpperCase()
     if (trackingNumber) knownTrackingNumbers.add(trackingNumber)
   })
+  if (allDataRows.length) {
+    await formatReleaseOrderRows(2, allDataRows.length + 2)
+  }
   return { rows }
 }
 
@@ -124,6 +127,7 @@ export async function saveReleaseOrder({ trackingNumber, courier }) {
     )
     const updatedRange = result.updates?.updatedRange || ''
     const rowNumber = Number(updatedRange.match(/!(?:A|\$A)\$?(\d+)/)?.[1] || 0)
+    if (rowNumber) await formatReleaseOrderRows(rowNumber, rowNumber + 1)
     return { ok: true, message: `Resi ${trackingNumber} berhasil dicatat.`, rowNumber }
   } catch (error) {
     knownTrackingNumbers.delete(trackingNumber)
@@ -160,6 +164,37 @@ async function getReleaseOrderSheetId() {
   if (!sheet) throw new Error(`Sheet ${sheetName} tidak ditemukan.`)
   releaseOrderSheetId = sheet.properties.sheetId
   return releaseOrderSheetId
+}
+
+async function formatReleaseOrderRows(startRowNumber, endRowNumber) {
+  const sheetId = await getReleaseOrderSheetId()
+  await sheetsFetch(':batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [{
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: startRowNumber - 1,
+            endRowIndex: endRowNumber - 1,
+            startColumnIndex: 0,
+            endColumnIndex: 4,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 1, green: 1, blue: 1 },
+              horizontalAlignment: 'LEFT',
+              textFormat: {
+                foregroundColor: { red: 0, green: 0, blue: 0 },
+                bold: false,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.horizontalAlignment,userEnteredFormat.textFormat',
+        },
+      }],
+    }),
+  })
 }
 
 export async function deleteReleaseOrder({ rowNumber, trackingNumber }) {
