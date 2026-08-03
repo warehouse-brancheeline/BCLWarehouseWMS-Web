@@ -16,11 +16,16 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [googleConnected, setGoogleConnected] = useState(false)
   const inputRef = useRef(null)
 
+  const focusScannerInput = () => {
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
   const loadRecent = async () => {
     if (releaseOrderLogConfigError || !googleConnected) return
     try {
       const result = await getRecentReleaseOrders(20)
       setRecentRows(result.rows || [])
+      focusScannerInput()
     } catch {
       // Scan tetap bisa digunakan walaupun riwayat gagal dimuat.
     }
@@ -37,6 +42,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       setRecentRows(result.rows || [])
       setMessageType('success')
       setMessage('Google Sheet terhubung. Scanner siap digunakan.')
+      focusScannerInput()
     } catch (error) {
       setMessageType('error')
       setMessage(error.message)
@@ -50,7 +56,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     if (!cleanTrackingNumber) {
       setMessageType('error')
       setMessage('Nomor resi wajib diisi.')
-      inputRef.current?.focus()
+      focusScannerInput()
       return
     }
 
@@ -69,7 +75,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       setMessage(error.message)
     } finally {
       setSaving(false)
-      inputRef.current?.focus()
+      focusScannerInput()
     }
   }
 
@@ -105,9 +111,12 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             <label htmlFor="release-order-tracking">Nomor resi</label>
             <div className="release-order-input-row">
               <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
-                placeholder="Scan atau ketik nomor resi" autoComplete="off"
+                placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
                 disabled={saving || Boolean(releaseOrderLogConfigError) || !googleConnected}
-                onChange={(event) => setTrackingNumber(event.target.value)} />
+                onChange={(event) => setTrackingNumber(event.target.value)}
+                onBlur={() => {
+                  if (googleConnected && !saving) focusScannerInput()
+                }} />
               <button className="primary-button" type="submit"
                 disabled={saving || Boolean(releaseOrderLogConfigError) || !googleConnected}>
                 {saving ? 'Menyimpan...' : 'Catat Resi'}
