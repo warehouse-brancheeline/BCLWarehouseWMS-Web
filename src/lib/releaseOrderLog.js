@@ -19,6 +19,7 @@ const sheetName = 'Release Order Log'
 const app = getApps()[0] || initializeApp(firebaseConfig)
 const auth = getAuth(app)
 let accessToken = ''
+const knownTrackingNumbers = new Set()
 
 export const releaseOrderLogConfigError = ''
 
@@ -63,26 +64,34 @@ export async function getRecentReleaseOrders(limit = 20) {
     trackingNumber: row[1] || '',
     source: row[2] || 'WMS Web',
   }))
+  const allDataRows = (result.values || []).slice(1)
+  allDataRows.forEach((row) => {
+    const trackingNumber = String(row[1] || '').trim().toUpperCase()
+    if (trackingNumber) knownTrackingNumbers.add(trackingNumber)
+  })
   return { rows }
 }
 
 export async function saveReleaseOrder({ trackingNumber }) {
-  const resiRange = encodeURIComponent(`${sheetName}!B:B`)
-  const history = await sheetsFetch(`/values/${resiRange}?majorDimension=COLUMNS`)
-  const existing = (history.values?.[0] || []).some(
-    (value) => String(value).trim().toUpperCase() === trackingNumber,
-  )
-  if (existing) throw new Error(`Resi ${trackingNumber} sudah pernah direlease.`)
+  if (knownTrackingNumbers.has(trackingNumber)) {
+    throw new Error(`Resi ${trackingNumber} sudah pernah direlease.`)
+  }
+  knownTrackingNumbers.add(trackingNumber)
 
   const appendRange = encodeURIComponent(`${sheetName}!A:C`)
-  await sheetsFetch(
-    `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        values: [[new Date().toISOString(), trackingNumber, 'WMS Web']],
-      }),
-    },
-  )
+  try {
+    await sheetsFetch(
+      `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          values: [[new Date().toISOString(), trackingNumber, 'WMS Web']],
+        }),
+      },
+    )
+  } catch (error) {
+    knownTrackingNumbers.delete(trackingNumber)
+    throw error
+  }
   return { ok: true, message: `Resi ${trackingNumber} berhasil dicatat.` }
 }
