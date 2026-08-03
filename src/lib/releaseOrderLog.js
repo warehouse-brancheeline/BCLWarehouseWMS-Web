@@ -84,7 +84,7 @@ async function sheetsFetch(path, options = {}) {
 }
 
 export async function getRecentReleaseOrders(limit = 20) {
-  const range = encodeURIComponent(`${sheetName}!A:D`)
+  const range = encodeURIComponent(`${sheetName}!A:E`)
   const result = await sheetsFetch(`/values/${range}?majorDimension=ROWS`)
   const allDataRows = (result.values || []).slice(1)
   const rows = allDataRows
@@ -94,6 +94,7 @@ export async function getRecentReleaseOrders(limit = 20) {
       trackingNumber: row[1] || '',
       source: row[2] || 'WMS Web',
       courier: row[3] || '',
+      pickingList: row[4] || '',
     }))
     .filter((row) => row.trackingNumber)
     .slice(-limit)
@@ -108,20 +109,20 @@ export async function getRecentReleaseOrders(limit = 20) {
   return { rows }
 }
 
-export async function saveReleaseOrder({ trackingNumber, courier }) {
+export async function saveReleaseOrder({ trackingNumber, courier, pickingList }) {
   if (knownTrackingNumbers.has(trackingNumber)) {
     throw new Error(`Resi ${trackingNumber} sudah pernah direlease.`)
   }
   knownTrackingNumbers.add(trackingNumber)
 
-  const appendRange = encodeURIComponent(`${sheetName}!A:D`)
+  const appendRange = encodeURIComponent(`${sheetName}!A:E`)
   try {
     const result = await sheetsFetch(
       `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       {
         method: 'POST',
         body: JSON.stringify({
-          values: [[new Date().toISOString(), trackingNumber, 'WMS Web', courier]],
+          values: [[new Date().toISOString(), trackingNumber, 'WMS Web', courier, pickingList]],
         }),
       },
     )
@@ -135,7 +136,13 @@ export async function saveReleaseOrder({ trackingNumber, courier }) {
   }
 }
 
-export async function updateReleaseOrder({ rowNumber, oldTrackingNumber, trackingNumber, courier }) {
+export async function updateReleaseOrder({
+  rowNumber,
+  oldTrackingNumber,
+  trackingNumber,
+  courier,
+  pickingList,
+}) {
   const normalizedTrackingNumber = String(trackingNumber || '').trim().toUpperCase()
   if (!normalizedTrackingNumber) throw new Error('Nomor resi wajib diisi.')
   if (normalizedTrackingNumber !== oldTrackingNumber
@@ -143,11 +150,11 @@ export async function updateReleaseOrder({ rowNumber, oldTrackingNumber, trackin
     throw new Error(`Resi ${normalizedTrackingNumber} sudah pernah direlease.`)
   }
 
-  const range = encodeURIComponent(`${sheetName}!B${rowNumber}:D${rowNumber}`)
+  const range = encodeURIComponent(`${sheetName}!B${rowNumber}:E${rowNumber}`)
   await sheetsFetch(`/values/${range}?valueInputOption=USER_ENTERED`, {
     method: 'PUT',
     body: JSON.stringify({
-      values: [[normalizedTrackingNumber, 'WMS Web', courier]],
+      values: [[normalizedTrackingNumber, 'WMS Web', courier, pickingList]],
     }),
   })
   knownTrackingNumbers.delete(oldTrackingNumber)
@@ -178,7 +185,7 @@ async function formatReleaseOrderRows(startRowNumber, endRowNumber) {
             startRowIndex: startRowNumber - 1,
             endRowIndex: endRowNumber - 1,
             startColumnIndex: 0,
-            endColumnIndex: 4,
+            endColumnIndex: 5,
           },
           cell: {
             userEnteredFormat: {
