@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   getRecentReleaseOrders,
   connectReleaseOrderSheet,
+  disconnectReleaseOrderSheet,
+  hasSavedReleaseOrderConnection,
   releaseOrderLogConfigError,
   saveReleaseOrder,
 } from '../lib/releaseOrderLog'
@@ -26,7 +28,9 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('')
   const [recentRows, setRecentRows] = useState([])
-  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleConnected, setGoogleConnected] = useState(
+    () => hasSavedReleaseOrderConnection(),
+  )
   const inputRef = useRef(null)
   const scanQueueRef = useRef(Promise.resolve())
   const queuedTrackingNumbersRef = useRef(new Set())
@@ -46,7 +50,12 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     }
   }
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+    if (googleConnected) window.setTimeout(loadRecent, 0)
+    // Pemeriksaan sesi cukup dilakukan sekali saat halaman dibuka.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleConnectGoogle = async () => {
     setMessage('')
@@ -62,6 +71,14 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       setMessageType('error')
       setMessage(error.message)
     }
+  }
+
+  const handleChangeGoogleSheet = () => {
+    disconnectReleaseOrderSheet()
+    setGoogleConnected(false)
+    setRecentRows([])
+    setMessageType('success')
+    setMessage('Sambungan lama dilepas. Klik Hubungkan Google Sheet untuk memilih akun kembali.')
   }
 
   const handleSubmit = (event) => {
@@ -151,10 +168,16 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             <h2>Scan nomor resi</h2>
             <p>Arahkan scanner ke barcode resi. Data tersimpan saat scanner mengirim Enter.</p>
           </div>
-          {!googleConnected && !releaseOrderLogConfigError ? (
-            <button className="release-order-google-button" type="button" onClick={handleConnectGoogle}>
-              Hubungkan Google Sheet
-            </button>
+          {!releaseOrderLogConfigError ? (
+            googleConnected ? (
+              <button className="release-order-google-button" type="button" onClick={handleChangeGoogleSheet}>
+                Ganti Google Sheet
+              </button>
+            ) : (
+              <button className="release-order-google-button" type="button" onClick={handleConnectGoogle}>
+                Hubungkan Google Sheet
+              </button>
+            )
           ) : null}
           <form onSubmit={handleSubmit}>
             <label htmlFor="release-order-tracking">Nomor resi</label>
