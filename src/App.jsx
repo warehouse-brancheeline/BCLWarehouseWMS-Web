@@ -28,6 +28,7 @@ const ScanPackHistoryPage = lazy(() => import('./pages/ScanPackHistoryPage'))
 const CancelledShipmentsPage = lazy(() => import('./pages/CancelledShipmentsPage'))
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'))
 const MasterEkspedisiPage = lazy(() => import('./pages/MasterEkspedisiPage'))
+const ReleaseOrderLogPage = lazy(() => import('./pages/ReleaseOrderLogPage'))
 
 // ─── Loading fallback ────────────────────────────────────────
 function PageLoading({ message = 'Memuat halaman...' }) {
@@ -255,6 +256,7 @@ function AppRoutes({ session, initializing, profile, profileLoading }) {
                   onOpenScanPack={() => navigate('/scan-pack')}
                   onOpenUserManagement={() => navigate('/user-management')}
                   onOpenMasterEkspedisi={() => navigate('/master-ekspedisi')}
+                  onOpenReleaseOrderLog={() => navigate('/release-order-log')}
                 />
               </RequireAuth>
             }
@@ -373,6 +375,24 @@ function AppRoutes({ session, initializing, profile, profileLoading }) {
                   allowedRoles={['admin', 'admin_warehouse']}
                 >
                   <MasterEkspedisiPage
+                    profile={profile}
+                    loadingLogout={loading}
+                    onBack={() => navigate('/')}
+                    onLogout={handleLogout}
+                  />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Release Order Log (Admin only, web only) ── */}
+          <Route
+            path="/release-order-log"
+            element={
+              <RequireAuth session={session} initializing={initializing}>
+                <RequireRole profile={profile} allowedRoles={['admin']}>
+                  <ReleaseOrderLogPage
+                    session={session}
                     profile={profile}
                     loadingLogout={loading}
                     onBack={() => navigate('/')}
