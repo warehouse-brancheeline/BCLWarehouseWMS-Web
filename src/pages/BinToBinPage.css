@@ -1,7 +1,7 @@
 .bbt-page {
   min-height: 100vh;
   padding: 24px;
-  background: #f4f7fb;
+  background: #FFFCE1;
 }
 
 .bbt-header {
@@ -14,12 +14,12 @@
 
 .bbt-header h1 {
   margin: 4px 0 0;
-  color: #172038;
+  color: #1a1a1a;
 }
 
 .bbt-small-label {
   margin: 0;
-  color: #4b5d7a;
+  color: #333333;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -45,13 +45,13 @@
 }
 
 .bbt-secondary-button {
-  color: #23324b;
-  background: #e9eef8;
+  color: #333333;
+  background: #FBEFD9;
 }
 
 .bbt-primary-button {
-  color: #ffffff;
-  background: #315ee8;
+  color: #1a1a1a;
+  background: #FFBE91;
 }
 
 .bbt-success-button {
@@ -74,10 +74,10 @@
 .bbt-summary-card,
 .bbt-detail-card,
 .bbt-table-card {
-  border: 1px solid #e1e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 24px rgba(45, 33, 18, 0.04);
 }
 
 .bbt-summary-card {
@@ -87,12 +87,12 @@
 .bbt-summary-card span {
   display: block;
   margin-bottom: 10px;
-  color: #747d90;
+  color: #595959;
   font-size: 13px;
 }
 
 .bbt-summary-card strong {
-  color: #172038;
+  color: #1a1a1a;
   font-size: 27px;
 }
 
@@ -105,12 +105,12 @@
 
 .bbt-toolbar h2 {
   margin: 0 0 5px;
-  color: #172038;
+  color: #1a1a1a;
 }
 
 .bbt-toolbar p {
   margin: 0;
-  color: #747d90;
+  color: #595959;
 }
 
 .bbt-toolbar-actions {
@@ -123,7 +123,7 @@
   width: 320px;
   min-height: 46px;
   padding: 0 14px;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
   border-radius: 12px;
   background: #ffffff;
 }
@@ -145,22 +145,22 @@
 .bbt-table th,
 .bbt-table td {
   padding: 14px 16px;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid #FBEFD9;
   text-align: left;
   vertical-align: middle;
   white-space: nowrap;
 }
 
 .bbt-table th {
-  color: #626c80;
-  background: #f8f9fc;
+  color: #595959;
+  background: #FFFCE1;
   font-size: 12px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .bbt-table tbody tr:hover {
-  background: #f8faff;
+  background: #FFFCE1;
 }
 
 .bbt-table tbody tr:last-child td {
@@ -170,7 +170,7 @@
 .bbt-link-button {
   padding: 0;
   border: 0;
-  color: #315ee8;
+  color: #1a1a1a;
   background: transparent;
   font-weight: 700;
   cursor: pointer;
@@ -180,8 +180,8 @@
   display: inline-block;
   padding: 6px 9px;
   border-radius: 8px;
-  color: #234cc6;
-  background: #edf2ff;
+  color: #1a1a1a;
+  background: #FFDDB0;
   font-size: 13px;
   font-weight: 800;
 }
@@ -195,13 +195,13 @@
 }
 
 .bbt-status-submitted {
-  color: #234cc6;
-  background: #e9f0ff;
+  color: #1a1a1a;
+  background: #FBEFD9;
 }
 
 .bbt-status-draft {
-  color: #5a6475;
-  background: #e8eaef;
+  color: #333333;
+  background: #FBEFD9;
 }
 
 .bbt-status-processing {
@@ -220,8 +220,8 @@
 }
 
 .bbt-status-cancelled {
-  color: #4a5568;
-  background: #e5e7eb;
+  color: #333333;
+  background: #F0DFC0;
 }
 
 .bbt-status-closed {
@@ -231,7 +231,7 @@
 
 .bbt-empty-table {
   padding: 46px !important;
-  color: #747d90;
+  color: #595959;
   text-align: center !important;
 }
 
@@ -253,10 +253,10 @@
 
 .bbt-status-panel {
   padding: 22px;
-  border: 1px solid #e1e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 24px rgba(45, 33, 18, 0.04);
 }
 
 .bbt-status-panel-header {
@@ -269,12 +269,12 @@
 
 .bbt-status-panel-header h3 {
   margin: 4px 0 0;
-  color: #172038;
+  color: #1a1a1a;
 }
 
 .bbt-status-description {
   margin: 0 0 16px;
-  color: #4b5d7a;
+  color: #333333;
 }
 
 .bbt-status-grid {
@@ -286,9 +286,9 @@
 
 .bbt-status-field {
   padding: 12px 14px;
-  border: 1px solid #edf0f5;
+  border: 1px solid #FBEFD9;
   border-radius: 12px;
-  background: #f8f9fc;
+  background: #FFFCE1;
 }
 
 .bbt-status-field p {
@@ -296,7 +296,7 @@
 }
 
 .bbt-status-field span {
-  color: #4b5d7a;
+  color: #333333;
   font-size: 13px;
 }
 
@@ -309,7 +309,7 @@
 
 .bbt-status-note-label {
   width: 100%;
-  color: #4b5d7a;
+  color: #333333;
   font-size: 13px;
   font-weight: 700;
 }
@@ -318,7 +318,7 @@
   width: 100%;
   min-height: 92px;
   padding: 10px 12px;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
   border-radius: 12px;
   resize: vertical;
 }
@@ -361,12 +361,12 @@
 
 .bbt-detail-header h2 {
   margin: 4px 0 0;
-  color: #172038;
+  color: #1a1a1a;
 }
 
 .bbt-label {
   margin: 0 0 4px;
-  color: #747d90;
+  color: #595959;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -387,17 +387,17 @@
 }
 
 .bbt-detail-grid strong {
-  color: #172038;
+  color: #1a1a1a;
 }
 
 .bbt-detail-notes {
   padding-top: 8px;
-  border-top: 1px solid #edf0f5;
+  border-top: 1px solid #FBEFD9;
 }
 
 .bbt-detail-notes p:last-child {
   margin: 0;
-  color: #172038;
+  color: #1a1a1a;
 }
 
 @media (max-width: 900px) {
@@ -466,25 +466,25 @@
 }
 
 .bbt-header-actions .bbt-secondary-button {
-  border: 1px solid #cad2e1;
-  color: #172b55;
+  border: 1px solid #F0DFC0;
+  color: #1a1a1a;
   background: #ffffff;
 }
 
 .bbt-header-actions .bbt-secondary-button:hover:not(:disabled) {
-  border-color: #315ee8;
-  color: #234cc6;
-  background: #f7f9ff;
+  border-color: #FFBE91;
+  color: #1a1a1a;
+  background: #FFFCE1;
 }
 
 .bbt-header-actions .bbt-primary-button {
-  border: 1px solid #315ee8;
-  color: #ffffff;
-  background: #315ee8;
+  border: 1px solid #FFBE91;
+  color: #1a1a1a;
+  background: #FFBE91;
 }
 
 .bbt-header-actions .bbt-primary-button:hover:not(:disabled) {
-  background: #274fc9;
+  background: #F5934A;
 }
 
 .bbt-header-actions button:disabled {
@@ -536,12 +536,12 @@
 .bbt-confirm-dialog h2 {
   margin: 0 0 12px;
   font-size: 18px;
-  color: #1a202c;
+  color: #1a1a1a;
 }
 
 .bbt-confirm-dialog p {
   margin: 0 0 24px;
-  color: #4a5568;
+  color: #333333;
   font-size: 15px;
   line-height: 1.5;
 }

@@ -622,7 +622,7 @@ function UserManagementPage({
                 style={{
                   width: '100%',
                   padding: '8px 12px',
-                  border: '1px solid #d1d5db',
+                  border: '1px solid #E3C9A0',
                   borderRadius: '8px',
                   fontSize: '14px',
                 }}
@@ -666,7 +666,7 @@ function UserManagementPage({
                             style={{
                               textAlign: 'center',
                               padding: '20px',
-                              color: '#6b7280',
+                              color: '#595959',
                             }}
                           >
                             Tidak ada user yang cocok.
@@ -678,7 +678,7 @@ function UserManagementPage({
                             key={user.id}
                             style={
                               editingUser?.id === user.id
-                                ? { background: '#eff6ff' }
+                                ? { background: '#CFEBFF' }
                                 : {}
                             }
                           >

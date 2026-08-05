@@ -25,7 +25,7 @@ class ErrorBoundary extends Component {
           <section className="message-card">
             <h1>Terjadi Kesalahan</h1>
 
-            <p style={{ color: '#6b7280', marginBottom: '16px' }}>
+            <p style={{ color: '#595959', marginBottom: '16px' }}>
               Halaman gagal dimuat. Ini mungkin disebabkan oleh koneksi
               internet atau kesalahan sistem.
             </p>
@@ -34,8 +34,8 @@ class ErrorBoundary extends Component {
               <p
                 style={{
                   fontSize: '13px',
-                  color: '#9ca3af',
-                  background: '#f9fafb',
+                  color: '#7a7a7a',
+                  background: '#FFFCE1',
                   padding: '12px',
                   borderRadius: '8px',
                   marginBottom: '16px',

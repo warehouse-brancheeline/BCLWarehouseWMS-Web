@@ -11,7 +11,7 @@
 .cancel-information-card,
 .cancel-history-card {
   padding: 24px;
-  border: 1px solid #e1e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
 }
@@ -48,8 +48,8 @@
   min-height: 30px;
   padding: 0 11px;
   border-radius: 999px;
-  color: #234cc6;
-  background: #edf2ff;
+  color: #1a1a1a;
+  background: #FFDDB0;
   font-size: 12px;
   font-weight: 800;
 }
@@ -59,9 +59,9 @@
 .cancel-toolbar select {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid #cad2e1;
+  border: 1px solid #F0DFC0;
   border-radius: 12px;
-  color: #172038;
+  color: #1a1a1a;
   background: #ffffff;
   font: inherit;
   outline: none;
@@ -70,9 +70,9 @@
 .cancel-form-card textarea:focus,
 .cancel-form-card select:focus,
 .cancel-toolbar select:focus {
-  border-color: #315ee8;
+  border-color: #FFBE91;
   box-shadow:
-    0 0 0 3px rgba(49, 94, 232, 0.12);
+    0 0 0 3px rgba(255, 190, 145, 0.12);
 }
 
 .cancel-form-card textarea {
@@ -87,12 +87,12 @@
 
 .input-information {
   margin-top: -2px;
-  color: #6f788c;
+  color: #595959;
   font-size: 13px;
 }
 
 .input-information strong {
-  color: #172038;
+  color: #1a1a1a;
   font-size: 16px;
 }
 
@@ -124,7 +124,7 @@
   align-items: flex-start;
   gap: 13px;
   padding: 17px 0;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid #FBEFD9;
 }
 
 .validation-step:last-child {
@@ -138,8 +138,8 @@
   height: 34px;
   place-items: center;
   border-radius: 10px;
-  color: #ffffff;
-  background: #315ee8;
+  color: #1a1a1a;
+  background: #FFBE91;
   font-weight: 800;
 }
 
@@ -150,7 +150,7 @@
 
 .validation-step p {
   margin: 0;
-  color: #70798c;
+  color: #595959;
   line-height: 1.5;
 }
 
@@ -169,13 +169,13 @@
 
 .cancel-history-header {
   padding: 22px 24px;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid #FBEFD9;
 }
 
 .cancel-toolbar {
   justify-content: flex-start;
   padding: 18px 24px;
-  background: #f8f9fc;
+  background: #FFFCE1;
 }
 
 .cancel-toolbar input {
@@ -200,26 +200,26 @@
 .cancel-table th,
 .cancel-table td {
   padding: 15px 17px;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid #FBEFD9;
   text-align: left;
   vertical-align: middle;
   white-space: nowrap;
 }
 
 .cancel-table th {
-  color: #626c80;
-  background: #f8f9fc;
+  color: #595959;
+  background: #FFFCE1;
   font-size: 12px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .cancel-table tbody tr:hover {
-  background: #fafbfe;
+  background: #FFFCE1;
 }
 
 .tracking-number {
-  color: #172038;
+  color: #1a1a1a;
   letter-spacing: 0.02em;
 }
 
@@ -227,8 +227,8 @@
   display: inline-flex;
   padding: 6px 9px;
   border-radius: 8px;
-  color: #48536a;
-  background: #eef1f6;
+  color: #333333;
+  background: #FBEFD9;
   font-size: 12px;
   font-weight: 800;
 }
@@ -277,8 +277,8 @@
 .table-result-information {
   margin: 0;
   padding: 15px 24px;
-  color: #747d90;
-  background: #f8f9fc;
+  color: #595959;
+  background: #FFFCE1;
   font-size: 13px;
 }
 
@@ -324,11 +324,11 @@
 .cancel-stat-card {
   min-width: 0;
   padding: 20px;
-  border: 1px solid #e4e8f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
   box-shadow:
-    0 8px 24px rgba(20, 30, 55, 0.05);
+    0 8px 24px rgba(40, 28, 16, 0.05);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -337,9 +337,9 @@
 
 .cancel-stat-card:hover {
   transform: translateY(-2px);
-  border-color: #d4dae7;
+  border-color: #F0DFC0;
   box-shadow:
-    0 12px 30px rgba(20, 30, 55, 0.09);
+    0 12px 30px rgba(40, 28, 16, 0.09);
 }
 
 .cancel-stat-top {
@@ -356,7 +356,7 @@
   height: 44px;
   place-items: center;
   border-radius: 13px;
-  background: #edf2ff;
+  background: #FFDDB0;
   font-size: 21px;
   line-height: 1;
 }
@@ -375,7 +375,7 @@
 
 .cancel-stat-label {
   min-width: 0;
-  color: #6b7487;
+  color: #595959;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
@@ -383,7 +383,7 @@
 
 .cancel-stat-value {
   display: block;
-  color: #172038;
+  color: #1a1a1a;
   font-size: 34px;
   font-weight: 800;
   line-height: 1;
@@ -432,12 +432,12 @@
 .cancel-confirm-dialog h2 {
   margin: 0 0 12px;
   font-size: 18px;
-  color: #1a202c;
+  color: #1a1a1a;
 }
 
 .cancel-confirm-dialog p {
   margin: 0 0 24px;
-  color: #4a5568;
+  color: #333333;
   font-size: 15px;
   line-height: 1.5;
 }

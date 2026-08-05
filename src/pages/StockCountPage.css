@@ -14,7 +14,7 @@
 
 .stock-summary-card {
   padding: 22px;
-  border: 1px solid #e1e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 17px;
   background: #ffffff;
 }
@@ -22,12 +22,12 @@
 .stock-summary-card span {
   display: block;
   margin-bottom: 10px;
-  color: #747d90;
+  color: #595959;
   font-size: 13px;
 }
 
 .stock-summary-card strong {
-  color: #172038;
+  color: #1a1a1a;
   font-size: 27px;
 }
 
@@ -45,7 +45,7 @@
 
 .stock-toolbar p {
   margin: 0;
-  color: #747d90;
+  color: #595959;
 }
 
 .stock-toolbar-actions {
@@ -66,8 +66,8 @@
   padding: 0 18px;
   border: 0;
   border-radius: 11px;
-  color: #ffffff;
-  background: #315ee8;
+  color: #1a1a1a;
+  background: #FFBE91;
   font-weight: 800;
 }
 
@@ -83,7 +83,7 @@
 
 .stock-table-card {
   overflow: hidden;
-  border: 1px solid #e1e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
 }
@@ -108,22 +108,22 @@
 .stock-table th,
 .stock-table td {
   padding: 15px 16px;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid #FBEFD9;
   text-align: left;
   vertical-align: middle;
   white-space: nowrap;
 }
 
 .stock-table th {
-  color: #626c80;
-  background: #f8f9fc;
+  color: #595959;
+  background: #FFFCE1;
   font-size: 12px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .stock-table tbody tr:hover {
-  background: #f8faff;
+  background: #FFFCE1;
 }
 
 .stock-table tbody tr:last-child td {
@@ -133,7 +133,7 @@
 .transaction-number-button {
   padding: 0;
   border: 0;
-  color: #315ee8;
+  color: #1a1a1a;
   background: transparent;
   font-weight: 900;
   text-decoration: underline;
@@ -144,8 +144,8 @@
   display: inline-block;
   padding: 6px 9px;
   border-radius: 8px;
-  color: #234cc6;
-  background: #edf2ff;
+  color: #1a1a1a;
+  background: #FFDDB0;
   font-size: 13px;
   font-weight: 800;
 }
@@ -159,8 +159,8 @@
 }
 
 .stock-status-draft {
-  color: #626c80;
-  background: #eef1f6;
+  color: #595959;
+  background: #FBEFD9;
 }
 
 .stock-status-progress {
@@ -169,8 +169,8 @@
 }
 
 .stock-status-submitted {
-  color: #234cc6;
-  background: #edf2ff;
+  color: #1a1a1a;
+  background: #FFDDB0;
 }
 
 .stock-status-reviewed {
@@ -202,12 +202,12 @@
 }
 
 .variance-zero {
-  color: #626c80 !important;
+  color: #595959 !important;
 }
 
 .stock-empty-table {
   padding: 46px !important;
-  color: #747d90;
+  color: #595959;
   text-align: center !important;
 }
 
@@ -218,7 +218,7 @@
   gap: 16px;
   margin-bottom: 20px;
   padding: 22px;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
 }
@@ -230,14 +230,14 @@
 .transaction-info-card span {
   display: block;
   margin-bottom: 8px;
-  color: #747d90;
+  color: #595959;
   font-size: 12px;
 }
 
 .transaction-info-card strong {
   display: block;
   overflow: hidden;
-  color: #172038;
+  color: #1a1a1a;
   text-overflow: ellipsis;
 }
 
@@ -267,7 +267,7 @@
 .stock-review-info-card {
   margin-bottom: 24px;
   padding: 22px;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
 }
@@ -275,12 +275,12 @@
 .stock-review-info-header {
   margin-bottom: 18px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #f0f2f7;
+  border-bottom: 2px solid #FBEFD9;
 }
 
 .stock-review-info-header h3 {
   margin: 0;
-  color: #172038;
+  color: #1a1a1a;
   font-size: 16px;
 }
 
@@ -298,14 +298,14 @@
 .stock-review-info-grid span {
   display: block;
   margin-bottom: 6px;
-  color: #747d90;
+  color: #595959;
   font-size: 12px;
 }
 
 .stock-review-info-grid strong {
   display: block;
   overflow: hidden;
-  color: #172038;
+  color: #1a1a1a;
   text-overflow: ellipsis;
 }
 
@@ -316,8 +316,8 @@
 .stock-review-notes-text {
   padding: 12px;
   border-radius: 8px;
-  background: #f8f9fc;
-  color: #626c80;
+  background: #FFFCE1;
+  color: #595959;
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -327,20 +327,20 @@
 .stock-review-panel {
   margin-bottom: 24px;
   padding: 22px;
-  border: 2px solid #e8eff8;
+  border: 2px solid #FBEFD9;
   border-radius: 18px;
-  background: #fafbfe;
+  background: #FFFCE1;
 }
 
 .stock-review-header {
   margin-bottom: 18px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #e8eff8;
+  border-bottom: 2px solid #FBEFD9;
 }
 
 .stock-review-header h3 {
   margin: 0;
-  color: #315ee8;
+  color: #1a1a1a;
   font-size: 16px;
   font-weight: 800;
 }
@@ -358,17 +358,17 @@
 }
 
 .stock-review-notes-field label {
-  color: #172038;
+  color: #1a1a1a;
   font-weight: 600;
   font-size: 13px;
 }
 
 .stock-review-textarea {
   padding: 12px;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
   border-radius: 11px;
   background: #ffffff;
-  color: #172038;
+  color: #1a1a1a;
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
@@ -376,13 +376,13 @@
 
 .stock-review-textarea:focus {
   outline: none;
-  border-color: #315ee8;
-  box-shadow: 0 0 0 3px rgba(49, 94, 232, 0.1);
+  border-color: #FFBE91;
+  box-shadow: 0 0 0 3px rgba(255, 190, 145, 0.1);
 }
 
 .stock-review-textarea:disabled {
-  background: #f0f2f7;
-  color: #999;
+  background: #FBEFD9;
+  color: #7a7a7a;
 }
 
 .stock-review-buttons {
@@ -480,13 +480,13 @@
 
 .stock-confirm-dialog h2 {
   margin: 0 0 16px;
-  color: #172038;
+  color: #1a1a1a;
   font-size: 18px;
 }
 
 .stock-confirm-dialog p {
   margin: 0 0 24px;
-  color: #626c80;
+  color: #595959;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -508,13 +508,13 @@
 }
 
 .primary-button {
-  color: #ffffff;
-  background: #315ee8;
+  color: #1a1a1a;
+  background: #FFBE91;
 }
 
 .primary-button:not(:disabled):hover {
-  background: #2248c4;
-  box-shadow: 0 2px 8px rgba(49, 94, 232, 0.3);
+  background: #F5934A;
+  box-shadow: 0 2px 8px rgba(255, 190, 145, 0.3);
 }
 
 .primary-button:disabled {
@@ -523,14 +523,14 @@
 }
 
 .secondary-button {
-  color: #315ee8;
+  color: #1a1a1a;
   background: transparent;
-  border: 1px solid #dce3f0;
+  border: 1px solid #F0DFC0;
 }
 
 .secondary-button:not(:disabled):hover {
-  background: #f8f9fc;
-  border-color: #c5cde3;
+  background: #FFFCE1;
+  border-color: #F0DFC0;
 }
 
 .secondary-button:disabled {

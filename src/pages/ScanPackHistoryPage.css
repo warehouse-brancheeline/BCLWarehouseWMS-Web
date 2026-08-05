@@ -1,7 +1,7 @@
 .sph-page {
   min-height: 100vh;
   padding: 24px;
-  background: #f4f7fb;
+  background: #FFFCE1;
 }
 
 .sph-header {
@@ -14,12 +14,12 @@
 
 .sph-header h1 {
   margin: 4px 0 0;
-  color: #172b55;
+  color: #1a1a1a;
 }
 
 .sph-subtitle {
   margin: 7px 0 0;
-  color: #687386;
+  color: #595959;
 }
 
 .sph-header-actions,
@@ -50,15 +50,15 @@
 }
 
 .sph-secondary-button {
-  border: 1px solid #cad2e1;
-  color: #172b55;
+  border: 1px solid #F0DFC0;
+  color: #1a1a1a;
   background: #ffffff;
 }
 
 .sph-primary-button {
-  border: 1px solid #315ee8;
-  color: #ffffff;
-  background: #315ee8;
+  border: 1px solid #FFBE91;
+  color: #1a1a1a;
+  background: #FFBE91;
 }
 
 .sph-danger-button {
@@ -91,11 +91,11 @@
 .sph-search-panel,
 .sph-panel,
 .sph-summary-card {
-  border: 1px solid #e0e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 8px 24px
-    rgba(15, 23, 42, 0.04);
+    rgba(45, 33, 18, 0.04);
 }
 
 .sph-search-panel {
@@ -113,7 +113,7 @@
 .sph-search-panel label span {
   display: block;
   margin-bottom: 8px;
-  color: #364158;
+  color: #333333;
   font-weight: 700;
 }
 
@@ -121,9 +121,9 @@
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border: 1px solid #cad2e1;
+  border: 1px solid #F0DFC0;
   border-radius: 12px;
-  color: #172b55;
+  color: #1a1a1a;
   background: #ffffff;
   font-size: 15px;
 }
@@ -141,14 +141,14 @@
 
 .sph-summary-card p {
   margin: 0 0 8px;
-  color: #687386;
+  color: #595959;
   font-size: 13px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .sph-summary-card strong {
-  color: #0f1f43;
+  color: #1a1a1a;
   font-size: 20px;
 }
 
@@ -166,12 +166,12 @@
 
 .sph-panel-header h2 {
   margin: 0 0 5px;
-  color: #172b55;
+  color: #1a1a1a;
 }
 
 .sph-panel-header p {
   margin: 0;
-  color: #687386;
+  color: #595959;
 }
 
 .sph-panel-header .sph-search {
@@ -191,14 +191,14 @@
 .sph-table th,
 .sph-table td {
   padding: 14px 16px;
-  border-top: 1px solid #e9edf4;
+  border-top: 1px solid #FBEFD9;
   text-align: left;
   vertical-align: middle;
 }
 
 .sph-table th {
-  color: #626c80;
-  background: #f8f9fc;
+  color: #595959;
+  background: #FFFCE1;
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -207,7 +207,7 @@
 .sph-link-button {
   padding: 0;
   border: 0;
-  color: #315ee8;
+  color: #1a1a1a;
   background: transparent;
   font-weight: 800;
   cursor: pointer;
@@ -255,7 +255,7 @@
 
 .sph-message {
   padding: 28px;
-  border: 1px solid #e0e6f0;
+  border: 1px solid #F0DFC0;
   border-radius: 18px;
   background: #ffffff;
   text-align: center;
@@ -269,7 +269,7 @@
 .sph-empty-table {
   padding: 40px !important;
   text-align: center !important;
-  color: #687386;
+  color: #595959;
 }
 
 .sph-modal-backdrop {
@@ -279,7 +279,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(45, 33, 18, 0.58);
 }
 
 .sph-modal {
@@ -288,19 +288,19 @@
   border-radius: 18px;
   background: #ffffff;
   box-shadow: 0 25px 70px
-    rgba(15, 23, 42, 0.3);
+    rgba(45, 33, 18, 0.3);
 }
 
 .sph-modal h2 {
   margin: 0 0 10px;
-  color: #172b55;
+  color: #1a1a1a;
 }
 
 .sph-modal-reference {
   padding: 13px 14px;
   margin: 18px 0;
   border-radius: 10px;
-  background: #f4f7fc;
+  background: #FFFCE1;
 }
 
 .sph-modal-actions {
@@ -316,9 +316,9 @@
   padding: 13px 18px;
   border-radius: 12px;
   color: #ffffff;
-  background: #172b55;
+  background: #1a1a1a;
   box-shadow: 0 16px 40px
-    rgba(15, 23, 42, 0.25);
+    rgba(45, 33, 18, 0.25);
 }
 
 @media (max-width: 1000px) {

@@ -470,7 +470,7 @@ function MasterEkspedisiPage({
                       display: 'block',
                       marginTop: '4px',
                       fontSize: '12px',
-                      color: '#6f788c',
+                      color: '#595959',
                     }}
                   >
                     Nomor resi akan dicocokkan persis (bukan awalannya saja).
@@ -597,7 +597,7 @@ function MasterEkspedisiPage({
                       </td>
                       <td>
                         <strong>{r.courier_code}</strong>
-                        <div style={{ color: '#6f788c', fontSize: 12 }}>
+                        <div style={{ color: '#595959', fontSize: 12 }}>
                           {r.courier_name}
                         </div>
                       </td>
@@ -641,7 +641,7 @@ function MasterEkspedisiPage({
                     <tr>
                       <td
                         colSpan={8}
-                        style={{ color: '#6f788c', padding: 18 }}
+                        style={{ color: '#595959', padding: 18 }}
                       >
                         Tidak ada data.
                       </td>
