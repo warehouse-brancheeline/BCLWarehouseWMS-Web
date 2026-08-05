@@ -44,6 +44,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_RELEASE_ORDER_SCRIPT_URL: ${{ secrets.VITE_RELEASE_ORDER_SCRIPT_URL }}
+          VITE_RELEASE_ORDER_SCRIPT_TOKEN: ${{ secrets.VITE_RELEASE_ORDER_SCRIPT_TOKEN }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

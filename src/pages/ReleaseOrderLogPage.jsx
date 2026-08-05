@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getRecentReleaseOrders,
-  connectReleaseOrderSheet,
-  disconnectReleaseOrderSheet,
+  getReleaseOrderSheetLink,
+  setReleaseOrderSheetLink,
   deleteReleaseOrder,
-  hasSavedReleaseOrderConnection,
   releaseOrderLogConfigError,
   saveReleaseOrder,
   updateReleaseOrder,
@@ -56,9 +55,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [screen, setScreen] = useState('home')
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedGroupCourier, setSelectedGroupCourier] = useState('')
-  const [googleConnected, setGoogleConnected] = useState(
-    () => hasSavedReleaseOrderConnection(),
-  )
+  const [sheetLink, setSheetLink] = useState(() => getReleaseOrderSheetLink())
   const [editingRowNumber, setEditingRowNumber] = useState(null)
   const [editTrackingNumber, setEditTrackingNumber] = useState('')
   const [editCourier, setEditCourier] = useState('')
@@ -74,7 +71,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   }
 
   const loadRecent = async () => {
-    if (releaseOrderLogConfigError || !googleConnected) return
+    if (releaseOrderLogConfigError) return
     try {
       const result = await getRecentReleaseOrders(20)
       setRecentRows(result.rows || [])
@@ -87,35 +84,25 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
 
   useEffect(() => {
     inputRef.current?.focus()
-    if (googleConnected) window.setTimeout(loadRecent, 0)
-    // Pemeriksaan sesi cukup dilakukan sekali saat halaman dibuka.
+    window.setTimeout(loadRecent, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleConnectGoogle = async () => {
-    setMessage('')
+  const handleChangeSheetLink = () => {
+    const newLink = window.prompt('Masukkan link Google Sheet baru:', sheetLink)
+    if (!newLink || newLink.trim() === sheetLink) return
     try {
-      await connectReleaseOrderSheet()
-      setGoogleConnected(true)
-      const result = await getRecentReleaseOrders(20)
-      setRecentRows(result.rows || [])
-      setAllRows(result.allRows || [])
+      setReleaseOrderSheetLink(newLink)
+      setSheetLink(newLink.trim())
+      setRecentRows([])
+      setAllRows([])
       setMessageType('success')
-      setMessage('Google Sheet terhubung. Scanner siap digunakan.')
-      focusScannerInput()
+      setMessage('Link Google Sheet diperbarui.')
+      loadRecent()
     } catch (error) {
       setMessageType('error')
       setMessage(error.message)
     }
-  }
-
-  const handleChangeGoogleSheet = () => {
-    disconnectReleaseOrderSheet()
-    setGoogleConnected(false)
-    setRecentRows([])
-    setAllRows([])
-    setMessageType('success')
-    setMessage('Sambungan lama dilepas. Klik Hubungkan Google Sheet untuk memilih akun kembali.')
   }
 
   const handleSubmit = (event) => {
@@ -432,16 +419,10 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                 <p>Pilih tanggal untuk melihat hasil scan per ekspedisi.</p>
               </div>
               <div className="release-order-overview-actions">
-                {!googleConnected ? (
-                  <button className="release-order-google-button" type="button" onClick={handleConnectGoogle}>
-                    Hubungkan Google Sheet
-                  </button>
-                ) : (
-                  <button className="secondary-button" type="button" onClick={handleChangeGoogleSheet}>
-                    Ganti Google Sheet
-                  </button>
-                )}
-                <button className="primary-button" type="button" disabled={!googleConnected}
+                <button className="secondary-button" type="button" onClick={handleChangeSheetLink}>
+                  Ganti Link Spreadsheet
+                </button>
+                <button className="primary-button" type="button" disabled={Boolean(releaseOrderLogConfigError)}
                   onClick={() => {
                     setScreen('scan')
                     focusScannerInput()
@@ -499,15 +480,9 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             ) : null}
           </div>
           {!releaseOrderLogConfigError ? (
-            googleConnected ? (
-              <button className="release-order-google-button" type="button" onClick={handleChangeGoogleSheet}>
-                Ganti Google Sheet
-              </button>
-            ) : (
-              <button className="release-order-google-button" type="button" onClick={handleConnectGoogle}>
-                Hubungkan Google Sheet
-              </button>
-            )
+            <button className="release-order-google-button" type="button" onClick={handleChangeSheetLink}>
+              Ganti Link Spreadsheet
+            </button>
           ) : null}
           <form onSubmit={handleSubmit}>
             <div className="release-order-input-row">
@@ -515,18 +490,18 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
                 <label htmlFor="release-order-tracking">Nomor resi</label>
                 <input ref={inputRef} id="release-order-tracking" value={trackingNumber}
                   placeholder="Scan atau ketik nomor resi" autoComplete="off" autoFocus
-                  disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
+                  disabled={Boolean(releaseOrderLogConfigError)}
                   onChange={(event) => setTrackingNumber(event.target.value)} />
               </div>
               <div className="release-order-field picking-list-field">
                 <label htmlFor="release-order-picking-list">Nomor Picking List</label>
                 <input id="release-order-picking-list" value={pickingList}
                   placeholder="Masukkan nomor picking list" autoComplete="off"
-                  disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}
+                  disabled={Boolean(releaseOrderLogConfigError)}
                   onChange={(event) => setPickingList(event.target.value.toUpperCase())} />
               </div>
               <button className="primary-button" type="submit"
-                disabled={Boolean(releaseOrderLogConfigError) || !googleConnected}>
+                disabled={Boolean(releaseOrderLogConfigError)}>
                 {pendingCount ? `Antrean ${pendingCount}` : 'Catat Resi'}
               </button>
             </div>
@@ -560,7 +535,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
               <p className="small-label">{screen === 'detail' ? formatDateLabel(selectedDate) : '20 SCAN TERBARU'}</p>
               <h2>{screen === 'detail' ? `Detail ${selectedGroupCourier}` : 'Riwayat Release'}</h2>
             </div>
-            <button className="secondary-button" type="button" disabled={!googleConnected} onClick={loadRecent}>Muat Ulang</button>
+            <button className="secondary-button" type="button" disabled={Boolean(releaseOrderLogConfigError)} onClick={loadRecent}>Muat Ulang</button>
           </div>
           <div className="release-order-table-wrap">
             <table>

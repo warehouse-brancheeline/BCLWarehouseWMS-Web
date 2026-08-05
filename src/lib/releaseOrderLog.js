@@ -1,112 +1,63 @@
-import { getApps, initializeApp } from 'firebase/app'
-import {
-  GoogleAuthProvider,
-  getAuth,
-  signInWithPopup,
-} from 'firebase/auth'
-
-const firebaseConfig = {
-  apiKey: 'AIzaSyCyo8sxnuLqmGnFIMfn8Rlph-9tFiw7VdE',
-  authDomain: 'bcl-warehouse-wms.firebaseapp.com',
-  projectId: 'bcl-warehouse-wms',
-  storageBucket: 'bcl-warehouse-wms.firebasestorage.app',
-  messagingSenderId: '342049876172',
-  appId: '1:342049876172:web:5765a1d6f00569c3defa69',
-}
-
-const spreadsheetId = '1QsDVycyI4BnvEJZlni-64z1uSpXWBmAjXKIRK2jwL9I'
-const sheetName = 'Release Order Log'
-const app = getApps()[0] || initializeApp(firebaseConfig)
-const auth = getAuth(app)
-let accessToken = ''
+const scriptUrl = (import.meta.env.VITE_RELEASE_ORDER_SCRIPT_URL || '').trim()
+const scriptToken = (import.meta.env.VITE_RELEASE_ORDER_SCRIPT_TOKEN || '').trim()
+const sheetLinkStorageKey = 'bcl-release-order-sheet-link'
+const defaultSheetLink = 'https://docs.google.com/spreadsheets/d/1QsDVycyI4BnvEJZlni-64z1uSpXWBmAjXKIRK2jwL9I/edit?gid=0#gid=0'
 const knownTrackingNumbers = new Set()
-let releaseOrderSheetId = null
-const tokenStorageKey = 'bcl-release-order-google-token'
-const tokenExpiryStorageKey = 'bcl-release-order-google-token-expiry'
 
-function clearSavedConnection() {
-  accessToken = ''
-  localStorage.removeItem(tokenStorageKey)
-  localStorage.removeItem(tokenExpiryStorageKey)
+export const releaseOrderLogConfigError = (!scriptUrl || !scriptToken)
+  ? 'Konfigurasi Release Order Log belum lengkap (VITE_RELEASE_ORDER_SCRIPT_URL/VITE_RELEASE_ORDER_SCRIPT_TOKEN).'
+  : ''
+
+function extractSpreadsheetId(url) {
+  const match = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
+  return match ? match[1] : ''
 }
 
-export function hasSavedReleaseOrderConnection() {
-  const savedToken = localStorage.getItem(tokenStorageKey) || ''
-  const expiresAt = Number(localStorage.getItem(tokenExpiryStorageKey) || 0)
-  if (!savedToken || expiresAt <= Date.now()) {
-    clearSavedConnection()
-    return false
-  }
-  accessToken = savedToken
-  return true
+export function getReleaseOrderSheetLink() {
+  return localStorage.getItem(sheetLinkStorageKey) || defaultSheetLink
 }
 
-export function disconnectReleaseOrderSheet() {
-  clearSavedConnection()
+export function setReleaseOrderSheetLink(url) {
+  const spreadsheetId = extractSpreadsheetId(url)
+  if (!spreadsheetId) throw new Error('Link Google Sheet tidak valid.')
+  localStorage.setItem(sheetLinkStorageKey, url.trim())
   knownTrackingNumbers.clear()
+  return spreadsheetId
 }
 
-export const releaseOrderLogConfigError = ''
-
-export async function connectReleaseOrderSheet() {
-  const provider = new GoogleAuthProvider()
-  provider.addScope('https://www.googleapis.com/auth/spreadsheets')
-  provider.setCustomParameters({ prompt: 'select_account' })
-
-  const result = await signInWithPopup(auth, provider)
-  const credential = GoogleAuthProvider.credentialFromResult(result)
-  accessToken = credential?.accessToken || ''
-  if (!accessToken) throw new Error('Izin Google Sheets tidak diberikan.')
-  localStorage.setItem(tokenStorageKey, accessToken)
-  localStorage.setItem(tokenExpiryStorageKey, String(Date.now() + (50 * 60 * 1000)))
-  return true
+function getSpreadsheetId() {
+  const spreadsheetId = extractSpreadsheetId(getReleaseOrderSheetLink())
+  if (!spreadsheetId) throw new Error('Link Google Sheet tidak valid.')
+  return spreadsheetId
 }
 
-async function sheetsFetch(path, options = {}) {
-  if (!accessToken) throw new Error('Hubungkan akun Google terlebih dahulu.')
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+async function callScript(action, params = {}, method = 'GET') {
+  if (releaseOrderLogConfigError) throw new Error(releaseOrderLogConfigError)
+  const spreadsheetId = getSpreadsheetId()
+  const payload = { token: scriptToken, spreadsheetId, action, ...params }
 
-  if (response.status === 401) {
-    clearSavedConnection()
-    throw new Error('Sesi Google berakhir. Hubungkan kembali akun Google.')
-  }
+  const response = method === 'GET'
+    ? await fetch(`${scriptUrl}?${new URLSearchParams(payload).toString()}`)
+    : await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    })
 
-  const result = await response.json()
-  if (!response.ok) throw new Error(result.error?.message || 'Google Sheet tidak merespons.')
+  const result = await response.json().catch(() => null)
+  if (!result) throw new Error('Release Order Log tidak merespons.')
+  if (result.error) throw new Error(result.error)
   return result
 }
 
 export async function getRecentReleaseOrders(limit = 20) {
-  const range = encodeURIComponent(`${sheetName}!A:E`)
-  const result = await sheetsFetch(`/values/${range}?majorDimension=ROWS`)
-  const allDataRows = (result.values || []).slice(1)
-  const allRows = allDataRows
-    .map((row, index) => ({
-      rowNumber: index + 2,
-      timestamp: row[0] || '',
-      trackingNumber: row[1] || '',
-      source: row[2] || 'WMS Web',
-      courier: row[3] || '',
-      pickingList: row[4] || '',
-    }))
-    .filter((row) => row.trackingNumber)
-  const rows = allRows
-    .slice(-limit)
-    .reverse()
-  allDataRows.forEach((row) => {
-    const trackingNumber = String(row[1] || '').trim().toUpperCase()
+  const result = await callScript('list')
+  const allRows = result.rows || []
+  allRows.forEach((row) => {
+    const trackingNumber = String(row.trackingNumber || '').trim().toUpperCase()
     if (trackingNumber) knownTrackingNumbers.add(trackingNumber)
   })
-  if (allDataRows.length) {
-    await formatReleaseOrderRows(2, allDataRows.length + 2)
-  }
+  const rows = allRows.slice(-limit).reverse()
   return { rows, allRows }
 }
 
@@ -115,22 +66,8 @@ export async function saveReleaseOrder({ trackingNumber, courier, pickingList })
     throw new Error(`Resi ${trackingNumber} sudah pernah direlease.`)
   }
   knownTrackingNumbers.add(trackingNumber)
-
-  const appendRange = encodeURIComponent(`${sheetName}!A:E`)
   try {
-    const result = await sheetsFetch(
-      `/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          values: [[new Date().toISOString(), trackingNumber, 'WMS Web', courier, pickingList]],
-        }),
-      },
-    )
-    const updatedRange = result.updates?.updatedRange || ''
-    const rowNumber = Number(updatedRange.match(/!(?:A|\$A)\$?(\d+)/)?.[1] || 0)
-    if (rowNumber) await formatReleaseOrderRows(rowNumber, rowNumber + 1)
-    return { ok: true, message: `Resi ${trackingNumber} berhasil dicatat.`, rowNumber }
+    return await callScript('append', { trackingNumber, courier, pickingList }, 'POST')
   } catch (error) {
     knownTrackingNumbers.delete(trackingNumber)
     throw error
@@ -151,77 +88,19 @@ export async function updateReleaseOrder({
     throw new Error(`Resi ${normalizedTrackingNumber} sudah pernah direlease.`)
   }
 
-  const range = encodeURIComponent(`${sheetName}!B${rowNumber}:E${rowNumber}`)
-  await sheetsFetch(`/values/${range}?valueInputOption=USER_ENTERED`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      values: [[normalizedTrackingNumber, 'WMS Web', courier, pickingList]],
-    }),
-  })
+  const result = await callScript('update', {
+    rowNumber,
+    trackingNumber: normalizedTrackingNumber,
+    courier,
+    pickingList,
+  }, 'POST')
   knownTrackingNumbers.delete(oldTrackingNumber)
   knownTrackingNumbers.add(normalizedTrackingNumber)
-  return { ok: true, message: `Resi ${normalizedTrackingNumber} berhasil diperbarui.` }
-}
-
-async function getReleaseOrderSheetId() {
-  if (releaseOrderSheetId !== null) return releaseOrderSheetId
-  const result = await sheetsFetch('?fields=sheets.properties(sheetId,title)')
-  const sheet = (result.sheets || []).find(
-    (item) => item.properties?.title === sheetName,
-  )
-  if (!sheet) throw new Error(`Sheet ${sheetName} tidak ditemukan.`)
-  releaseOrderSheetId = sheet.properties.sheetId
-  return releaseOrderSheetId
-}
-
-async function formatReleaseOrderRows(startRowNumber, endRowNumber) {
-  const sheetId = await getReleaseOrderSheetId()
-  await sheetsFetch(':batchUpdate', {
-    method: 'POST',
-    body: JSON.stringify({
-      requests: [{
-        repeatCell: {
-          range: {
-            sheetId,
-            startRowIndex: startRowNumber - 1,
-            endRowIndex: endRowNumber - 1,
-            startColumnIndex: 0,
-            endColumnIndex: 5,
-          },
-          cell: {
-            userEnteredFormat: {
-              backgroundColor: { red: 1, green: 1, blue: 1 },
-              horizontalAlignment: 'LEFT',
-              textFormat: {
-                foregroundColor: { red: 0, green: 0, blue: 0 },
-                bold: false,
-              },
-            },
-          },
-          fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.horizontalAlignment,userEnteredFormat.textFormat',
-        },
-      }],
-    }),
-  })
+  return result
 }
 
 export async function deleteReleaseOrder({ rowNumber, trackingNumber }) {
-  const sheetId = await getReleaseOrderSheetId()
-  await sheetsFetch(':batchUpdate', {
-    method: 'POST',
-    body: JSON.stringify({
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId,
-            dimension: 'ROWS',
-            startIndex: rowNumber - 1,
-            endIndex: rowNumber,
-          },
-        },
-      }],
-    }),
-  })
+  const result = await callScript('delete', { rowNumber, trackingNumber }, 'POST')
   knownTrackingNumbers.delete(trackingNumber)
-  return { ok: true, message: `Resi ${trackingNumber} berhasil dihapus.` }
+  return result
 }
