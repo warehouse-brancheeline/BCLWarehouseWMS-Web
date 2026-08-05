@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   getRecentReleaseOrders,
   connectReleaseOrderSheet,
@@ -64,6 +64,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
   const [editCourier, setEditCourier] = useState('')
   const [editPickingList, setEditPickingList] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
+  const [expandedPickingLists, setExpandedPickingLists] = useState(() => new Set())
   const inputRef = useRef(null)
   const scanQueueRef = useRef(Promise.resolve())
   const queuedTrackingNumbersRef = useRef(new Set())
@@ -253,6 +254,49 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     }
   }
 
+  const togglePickingListGroup = (pickingListKey) => {
+    setExpandedPickingLists((prev) => {
+      const next = new Set(prev)
+      if (next.has(pickingListKey)) next.delete(pickingListKey)
+      else next.add(pickingListKey)
+      return next
+    })
+  }
+
+  // Picking list yang sedang aktif di form scan (live, mengikuti ketikan/scan user).
+  const activePickingListKey = pickingList.trim().toUpperCase()
+
+  // Total resi yang sudah tercatat untuk picking list yang sedang dikerjakan (seluruh riwayat, bukan cuma 20 terbaru).
+  const activePickingListScanCount = activePickingListKey
+    ? allRows.filter((row) => (row.pickingList || '').trim().toUpperCase() === activePickingListKey).length
+    : 0
+
+  // Kelompokkan "20 scan terbaru" berdasarkan nomor picking list.
+  // Group untuk picking list yang sedang aktif selalu tampil flat (expanded).
+  // Group picking list lain otomatis collapse menjadi kartu ringkasan begitu user pindah ke picking list baru.
+  const historyGroups = useMemo(() => {
+    const order = []
+    const map = new Map()
+    recentRows.forEach((row) => {
+      const key = (row.pickingList || '').trim().toUpperCase() || 'TANPA PICKING LIST'
+      if (!map.has(key)) {
+        map.set(key, [])
+        order.push(key)
+      }
+      map.get(key).push(row)
+    })
+    const groups = order.map((key) => ({ pickingList: key, rows: map.get(key) }))
+    // Pin picking list aktif ke urutan paling atas, sisanya tetap urut dari yang paling baru discan.
+    groups.sort((a, b) => {
+      const aActive = activePickingListKey && a.pickingList === activePickingListKey
+      const bActive = activePickingListKey && b.pickingList === activePickingListKey
+      if (aActive && !bActive) return -1
+      if (bActive && !aActive) return 1
+      return 0
+    })
+    return groups
+  }, [recentRows, activePickingListKey])
+
   const dateGroups = [...new Set(allRows.map((row) => getDateKey(row.timestamp)))]
     .sort((a, b) => b.localeCompare(a))
     .map((date) => ({
@@ -280,6 +324,86 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
     if (screen === 'detail') setScreen('couriers')
     else if (screen === 'couriers' || screen === 'scan') setScreen('home')
     else onBack()
+  }
+
+  const renderHistoryRow = (row) => (
+    <tr key={`${row.timestamp}-${row.trackingNumber}`}>
+      <td>{row.timestamp}</td>
+      <td>
+        {editingRowNumber === row.rowNumber ? (
+          <input className="release-order-edit-input" value={editTrackingNumber}
+            onChange={(event) => setEditTrackingNumber(event.target.value.toUpperCase())} />
+        ) : <strong>{row.trackingNumber}</strong>}
+      </td>
+      <td>
+        {editingRowNumber === row.rowNumber ? (
+          <select className="release-order-edit-select" value={editCourier}
+            onChange={(event) => setEditCourier(event.target.value)}>
+            {couriers.map((courier) => <option key={courier}>{courier}</option>)}
+          </select>
+        ) : (row.courier || '-')}
+      </td>
+      <td>{row.source}</td>
+      <td>
+        {editingRowNumber === row.rowNumber ? (
+          <input className="release-order-edit-input" value={editPickingList}
+            onChange={(event) => setEditPickingList(event.target.value.toUpperCase())} />
+        ) : (row.pickingList || '-')}
+      </td>
+      <td>
+        <div className="release-order-row-actions">
+          {editingRowNumber === row.rowNumber ? (
+            <>
+              <button type="button" className="row-action save"
+                disabled={actionBusy || !editCourier || !editPickingList.trim()}
+                onClick={() => handleSaveEdit(row)}>Simpan</button>
+              <button type="button" className="row-action" disabled={actionBusy}
+                onClick={() => setEditingRowNumber(null)}>Batal</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="row-action" disabled={actionBusy || !row.rowNumber}
+                onClick={() => startEditing(row)}>Edit</button>
+              <button type="button" className="row-action delete" disabled={actionBusy || !row.rowNumber}
+                onClick={() => handleDelete(row)}>Hapus</button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+
+  const renderGroupedHistoryRows = () => {
+    if (!historyGroups.length) {
+      return <tr><td colSpan="6" className="release-order-empty">Belum ada data scan.</td></tr>
+    }
+    return historyGroups.flatMap((group) => {
+      const isActiveGroup = Boolean(activePickingListKey) && group.pickingList === activePickingListKey
+      const isExpanded = isActiveGroup || expandedPickingLists.has(group.pickingList)
+      const groupRow = (
+        <tr key={`group-${group.pickingList}`} className={`release-order-group-row${isActiveGroup ? ' active' : ''}`}>
+          <td colSpan="6">
+            <button
+              type="button"
+              className="release-order-group-toggle"
+              disabled={isActiveGroup}
+              onClick={() => togglePickingListGroup(group.pickingList)}
+            >
+              <span>
+                {isActiveGroup ? 'Picklist aktif · ' : ''}
+                {group.pickingList}
+              </span>
+              <span className="release-order-count">{group.rows.length} resi</span>
+              {!isActiveGroup ? (
+                <span className="release-order-group-caret">{isExpanded ? '▲' : '▼'}</span>
+              ) : null}
+            </button>
+          </td>
+        </tr>
+      )
+      if (!isExpanded) return [groupRow]
+      return [groupRow, ...group.rows.map((row) => renderHistoryRow(row))]
+    })
   }
 
   return (
@@ -368,6 +492,11 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
           <div>
             <h2>Scan nomor resi</h2>
             <p>Arahkan scanner ke barcode resi. Data tersimpan saat scanner mengirim Enter.</p>
+            {activePickingListKey ? (
+              <p className="release-order-picklist-hint">
+                Picklist <strong>{activePickingListKey}</strong>: {activePickingListScanCount} resi sudah discan
+              </p>
+            ) : null}
           </div>
           {!releaseOrderLogConfigError ? (
             googleConnected ? (
@@ -437,52 +566,11 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
             <table>
               <thead><tr><th>Waktu</th><th>Nomor Resi</th><th>Kurir</th><th>Sumber</th><th>No. Picking List</th><th>Aksi</th></tr></thead>
               <tbody>
-                {visibleRows.length ? visibleRows.map((row) => (
-                  <tr key={`${row.timestamp}-${row.trackingNumber}`}>
-                    <td>{row.timestamp}</td>
-                    <td>
-                      {editingRowNumber === row.rowNumber ? (
-                        <input className="release-order-edit-input" value={editTrackingNumber}
-                          onChange={(event) => setEditTrackingNumber(event.target.value.toUpperCase())} />
-                      ) : <strong>{row.trackingNumber}</strong>}
-                    </td>
-                    <td>
-                      {editingRowNumber === row.rowNumber ? (
-                        <select className="release-order-edit-select" value={editCourier}
-                          onChange={(event) => setEditCourier(event.target.value)}>
-                          {couriers.map((courier) => <option key={courier}>{courier}</option>)}
-                        </select>
-                      ) : (row.courier || '-')}
-                    </td>
-                    <td>{row.source}</td>
-                    <td>
-                      {editingRowNumber === row.rowNumber ? (
-                        <input className="release-order-edit-input" value={editPickingList}
-                          onChange={(event) => setEditPickingList(event.target.value.toUpperCase())} />
-                      ) : (row.pickingList || '-')}
-                    </td>
-                    <td>
-                      <div className="release-order-row-actions">
-                        {editingRowNumber === row.rowNumber ? (
-                          <>
-                            <button type="button" className="row-action save"
-                              disabled={actionBusy || !editCourier || !editPickingList.trim()}
-                              onClick={() => handleSaveEdit(row)}>Simpan</button>
-                            <button type="button" className="row-action" disabled={actionBusy}
-                              onClick={() => setEditingRowNumber(null)}>Batal</button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" className="row-action" disabled={actionBusy || !row.rowNumber}
-                              onClick={() => startEditing(row)}>Edit</button>
-                            <button type="button" className="row-action delete" disabled={actionBusy || !row.rowNumber}
-                              onClick={() => handleDelete(row)}>Hapus</button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )) : <tr><td colSpan="6" className="release-order-empty">Belum ada data scan.</td></tr>}
+                {screen === 'scan'
+                  ? renderGroupedHistoryRows()
+                  : (visibleRows.length
+                    ? visibleRows.map((row) => renderHistoryRow(row))
+                    : <tr><td colSpan="6" className="release-order-empty">Belum ada data scan.</td></tr>)}
               </tbody>
             </table>
           </div>
