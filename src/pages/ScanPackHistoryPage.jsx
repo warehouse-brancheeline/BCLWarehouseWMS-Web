@@ -259,7 +259,7 @@ function ScanPackHistoryPage({
         <header className="sph-header">
           <div>
             <p className="small-label">BCL Warehouse WMS</p>
-            <h1>Detail History Packing</h1>
+            <h1>Detail Packing Station</h1>
             <p className="sph-subtitle">
               Daftar resi berdasarkan Nomor Tugas Packing.
             </p>
@@ -501,7 +501,7 @@ function ScanPackHistoryPage({
       <header className="sph-header">
         <div>
           <p className="small-label">BCL Warehouse WMS</p>
-          <h1>History Packing</h1>
+          <h1>Packing Station</h1>
           <p className="sph-subtitle">
             Riwayat packing berdasarkan Nomor Tugas.
           </p>

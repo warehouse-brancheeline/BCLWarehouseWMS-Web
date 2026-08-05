@@ -706,7 +706,7 @@ function StockCountPage({
         <header className="dashboard-header">
           <div>
             <p className="small-label">BCL Warehouse WMS</p>
-            <h1>Detail Stock Count</h1>
+            <h1>Detail Stock Opname</h1>
           </div>
 
           <div className="stock-header-actions">
@@ -1029,7 +1029,7 @@ function StockCountPage({
       <header className="dashboard-header">
         <div>
           <p className="small-label">BCL Warehouse WMS</p>
-          <h1>Transaksi Stock Count</h1>
+          <h1>Stock Opname</h1>
         </div>
 
         <div className="stock-header-actions">

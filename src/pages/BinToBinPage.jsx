@@ -832,8 +832,8 @@ function BinToBinPage({
           <p className="bbt-small-label">BCL Warehouse WMS</p>
           <h1>
             {selectedTransfer
-              ? 'Detail Bin to Bin'
-              : 'Transaksi Bin to Bin'}
+              ? 'Detail Bin Transfer'
+              : 'Bin Transfer'}
           </h1>
         </div>
 

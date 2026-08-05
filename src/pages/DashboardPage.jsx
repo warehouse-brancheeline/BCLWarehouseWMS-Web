@@ -5,6 +5,16 @@
 // - Tambah menu Master Ekspedisi untuk admin dan admin_warehouse
 // ============================================================
 
+import {
+  BinTransferIcon,
+  ClipboardCheckIcon,
+  TruckIcon,
+  PackageIcon,
+  SlidersIcon,
+  ScanIcon,
+  UsersIcon,
+} from '../components/MenuIcons'
+
 function DashboardPage({
   session,
   loading,
@@ -65,9 +75,9 @@ function DashboardPage({
             type="button"
             onClick={onOpenBinToBin}
           >
-            <div className="menu-icon">BT</div>
-            <h3>Bin to Bin</h3>
-            <p>Lihat riwayat perpindahan stok antar lokasi.</p>
+            <div className="menu-icon"><BinTransferIcon /></div>
+            <h3>Bin Transfer</h3>
+            <p>Pantau riwayat perpindahan stok antar lokasi secara real-time.</p>
           </button>
 
           <button
@@ -75,9 +85,9 @@ function DashboardPage({
             type="button"
             onClick={onOpenStockCount}
           >
-            <div className="menu-icon">SC</div>
-            <h3>Stock Count</h3>
-            <p>Lihat hasil perhitungan fisik dan selisih stok.</p>
+            <div className="menu-icon"><ClipboardCheckIcon /></div>
+            <h3>Stock Opname</h3>
+            <p>Tinjau hasil perhitungan fisik dan selisih stok gudang.</p>
           </button>
 
           <button
@@ -85,9 +95,9 @@ function DashboardPage({
             type="button"
             onClick={onOpenHandover}
           >
-            <div className="menu-icon">HD</div>
-            <h3>Handover</h3>
-            <p>Pantau serah terima paket kepada kurir.</p>
+            <div className="menu-icon"><TruckIcon /></div>
+            <h3>Handover Kurir</h3>
+            <p>Monitor serah terima paket ke setiap mitra ekspedisi.</p>
           </button>
 
           <button
@@ -95,9 +105,9 @@ function DashboardPage({
             type="button"
             onClick={onOpenScanPack}
           >
-            <div className="menu-icon">SP</div>
-            <h3>Scan Pack</h3>
-            <p>Pantau paket yang telah selesai dipacking.</p>
+            <div className="menu-icon"><PackageIcon /></div>
+            <h3>Packing Station</h3>
+            <p>Lacak progres paket yang telah selesai di-packing.</p>
           </button>
 
           {/* ── Menu khusus Admin & Admin Warehouse ── */}
@@ -107,9 +117,9 @@ function DashboardPage({
               type="button"
               onClick={onOpenMasterEkspedisi}
             >
-              <div className="menu-icon">ME</div>
-              <h3>Master Ekspedisi</h3>
-              <p>Kelola rule prefix dan format resi ekspedisi.</p>
+              <div className="menu-icon"><SlidersIcon /></div>
+              <h3>Konfigurasi Ekspedisi</h3>
+              <p>Atur aturan prefix dan format resi tiap ekspedisi.</p>
             </button>
           ) : null}
 
@@ -121,18 +131,18 @@ function DashboardPage({
                 type="button"
                 onClick={onOpenReleaseOrderLog}
               >
-                <div className="menu-icon">RO</div>
-                <h3>Release Order Log</h3>
-                <p>Scan resi sebelum order diserahkan kepada picker.</p>
+                <div className="menu-icon"><ScanIcon /></div>
+                <h3>Release Scan</h3>
+                <p>Scan validasi resi sebelum order diserahkan ke picker.</p>
               </button>
               <button
                 className="menu-card menu-card-button"
                 type="button"
                 onClick={onOpenUserManagement}
               >
-                <div className="menu-icon">UM</div>
-                <h3>Manajemen User</h3>
-                <p>Daftarkan dan lihat akun pengguna WMS.</p>
+                <div className="menu-icon"><UsersIcon /></div>
+                <h3>Tim &amp; Akses</h3>
+                <p>Kelola akun dan hak akses pengguna sistem WMS.</p>
               </button>
             </>
           ) : null}

@@ -398,7 +398,7 @@ function ReleaseOrderLogPage({ loadingLogout, onBack, onLogout }) {
       <header className="release-order-header">
         <div>
           <p className="small-label">ADMIN WEB</p>
-          <h1>Release Order Log</h1>
+          <h1>Release Scan</h1>
           <p>Scan resi sebelum order diberikan kepada picker.</p>
         </div>
         <div className="release-order-header-actions">

@@ -786,7 +786,7 @@ function HandoverPage({
         <div className="handover-header-left">
           <div>
             <p className="small-label">BCL Warehouse WMS</p>
-            <h1>Handover</h1>
+            <h1>Handover Kurir</h1>
             <p className="handover-page-subtitle">
               Monitoring serah terima paket kepada kurir.
             </p>
@@ -1170,7 +1170,7 @@ function HandoverPage({
           <div className="handover-header-left">
             <div>
               <p className="small-label">BCL Warehouse WMS</p>
-              <h1>Detail Group Handover</h1>
+              <h1>Detail Handover Kurir</h1>
             </div>
           </div>
 

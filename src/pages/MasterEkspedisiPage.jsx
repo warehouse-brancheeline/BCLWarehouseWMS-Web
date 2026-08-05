@@ -320,7 +320,7 @@ function MasterEkspedisiPage({
       <header className="master-expedisi-header">
         <div>
           <p className="small-label">BCL Warehouse WMS</p>
-          <h1>Master Ekspedisi</h1>
+          <h1>Konfigurasi Ekspedisi</h1>
           <p className="master-expedisi-subtitle">
             Kelola rule prefix/format resi untuk validasi handover (tanpa
             update APK).

@@ -252,8 +252,8 @@ function CancelledShipmentsPage({
     <main className="dashboard-page">
       <header className="dashboard-header">
         <div>
-          <p className="small-label">Scan Pack</p>
-          <h1>Input Resi Cancel</h1>
+          <p className="small-label">Packing Station</p>
+          <h1>Pembatalan Order</h1>
         </div>
 
         <div className="header-actions">
@@ -283,7 +283,7 @@ function CancelledShipmentsPage({
             <div className="section-heading">
               <div>
                 <p className="small-label">Admin Website</p>
-                <h2>Tambah Resi Cancel</h2>
+                <h2>Catat Resi Batal</h2>
               </div>
               <span className="website-only-label">Website Only</span>
             </div>

@@ -13,11 +13,11 @@ function ScanPackPage({
       <div className="scan-pack-history-cancel-bar">
         <div>
           <p className="scan-pack-history-cancel-label">
-            ORDER CANCEL
+            PEMBATALAN ORDER
           </p>
 
           <strong>
-            Pengelolaan Order Cancel
+            Kelola Pembatalan Order
           </strong>
         </div>
 
@@ -26,7 +26,7 @@ function ScanPackPage({
           type="button"
           onClick={onOpenCancelledShipments}
         >
-          Input Resi Cancel
+          Catat Resi Batal
         </button>
       </div>
 

@@ -380,7 +380,7 @@ function UserManagementPage({
       <header className="user-management-header">
         <div>
           <p className="small-label">BCL Warehouse WMS</p>
-          <h1>Manajemen User</h1>
+          <h1>Tim &amp; Akses</h1>
           <p className="user-management-subtitle">
             Daftarkan dan kelola akun pengguna WMS.
           </p>
