@@ -100,7 +100,7 @@ function MasterEkspedisiPage({
     } catch (loadError) {
       console.error('Gagal memuat rules:', loadError)
       setError(
-        'Gagal memuat Master Ekspedisi. Pastikan tabel Supabase sudah dibuat dan RLS/policy benar.',
+        'Gagal memuat Konfigurasi Ekspedisi. Pastikan tabel Supabase sudah dibuat dan RLS/policy benar.',
       )
       setRules([])
     } finally {

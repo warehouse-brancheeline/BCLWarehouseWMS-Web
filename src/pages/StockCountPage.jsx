@@ -454,7 +454,7 @@ function StockCountPage({
       console.error(loadError)
       setSessions([])
       setError(
-        loadError?.message || 'Data Stock Count gagal dimuat.',
+        loadError?.message || 'Data Stock Opname gagal dimuat.',
       )
     } finally {
       setLoading(false)
@@ -619,7 +619,7 @@ function StockCountPage({
 
     const summaryRows = [
       ['BCL Warehouse WMS'],
-      ['Laporan Stock Count'],
+      ['Laporan Stock Opname'],
       [],
       ['Nomor Transaksi', selectedSession.transactionNumber],
       ['Staff Penghitung', selectedSession.staffName],
@@ -677,7 +677,7 @@ function StockCountPage({
     const detailSheet = await addJsonSheet(
       workbook,
       detailRows,
-      'Detail Stock Count',
+      'Detail Stock Opname',
     )
 
     summarySheet['!cols'] = [{ wch: 24 }, { wch: 35 }]
@@ -854,7 +854,7 @@ function StockCountPage({
           {!isReviewDisabled && (
             <div className="stock-review-panel">
               <div className="stock-review-header">
-                <h3>Review Stock Count</h3>
+                <h3>Review Stock Opname</h3>
               </div>
 
               <div className="stock-review-form">
@@ -1126,13 +1126,13 @@ function StockCountPage({
                 {loading ? (
                   <tr>
                     <td className="stock-empty-table" colSpan="8">
-                      Memuat transaksi Stock Count...
+                      Memuat transaksi Stock Opname...
                     </td>
                   </tr>
                 ) : pagination.totalItems === 0 ? (
                   <tr>
                     <td className="stock-empty-table" colSpan="8">
-                      Belum ada transaksi Stock Count.
+                      Belum ada transaksi Stock Opname.
                     </td>
                   </tr>
                 ) : (

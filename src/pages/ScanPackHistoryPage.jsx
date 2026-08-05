@@ -63,8 +63,8 @@ function ScanPackHistoryPage({
       if (rpcError) throw rpcError
       setTasks(data ?? [])
     } catch (loadError) {
-      console.error('Gagal memuat History Packing:', loadError)
-      setError('Gagal memuat History Packing. Silakan coba kembali.')
+      console.error('Gagal memuat Packing Station:', loadError)
+      setError('Gagal memuat Packing Station. Silakan coba kembali.')
     } finally {
       setLoading(false)
     }
@@ -85,7 +85,7 @@ function ScanPackHistoryPage({
       if (rpcError) throw rpcError
       setItems(data ?? [])
     } catch (loadError) {
-      console.error('Gagal memuat detail History Packing:', loadError)
+      console.error('Gagal memuat detail Packing Station:', loadError)
       setDetailError(
         'Gagal memuat detail Nomor Tugas. Silakan coba kembali.',
       )
@@ -215,7 +215,7 @@ function ScanPackHistoryPage({
       }))
 
       const workbook = await createWorkbook()
-      await addJsonSheet(workbook, rows, 'History Packing')
+      await addJsonSheet(workbook, rows, 'Packing Station')
       await downloadWorkbook(workbook, 'History_Packing.xlsx')
     } catch (err) {
       console.error('Gagal download Excel:', err)
@@ -593,12 +593,12 @@ function ScanPackHistoryPage({
         {loading ? (
           <div className="sph-message">
             <div className="spinner" />
-            <p>Memuat History Packing...</p>
+            <p>Memuat Packing Station...</p>
           </div>
         ) : null}
 
         {!loading && !error && tasks.length === 0 ? (
-          <div className="sph-message">Belum ada History Packing.</div>
+          <div className="sph-message">Belum ada data Packing Station.</div>
         ) : null}
 
         {!loading && !error && tasks.length > 0 ? (

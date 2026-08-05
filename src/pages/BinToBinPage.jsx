@@ -590,7 +590,7 @@ function BinToBinPage({
     } catch (loadError) {
       console.error(loadError)
       setTransactions([])
-      setError(loadError?.message || 'Riwayat Bin to Bin gagal dimuat.')
+      setError(loadError?.message || 'Riwayat Bin Transfer gagal dimuat.')
     } finally {
       setLoading(false)
     }
@@ -751,7 +751,7 @@ function BinToBinPage({
 
     const summaryRows = [
       ['BCL Warehouse WMS'],
-      ['Laporan Bin to Bin'],
+      ['Laporan Bin Transfer'],
       [],
       ['Nomor Transaksi', selectedTransfer.transferNumber],
       ['Staff', selectedTransfer.staffName || '-'],
@@ -803,7 +803,7 @@ function BinToBinPage({
     const detailSheet = await addAoaSheet(
       workbook,
       detailRowsWithHeader,
-      'Detail Bin to Bin',
+      'Detail Bin Transfer',
     )
 
     summarySheet['!cols'] = [
@@ -1175,7 +1175,7 @@ function BinToBinPage({
 
             <div className="bbt-toolbar">
               <div>
-                <h2>Daftar Transaksi Bin to Bin</h2>
+                <h2>Daftar Transaksi Bin Transfer</h2>
                 <p>
                   Cari berdasarkan nomor transaksi, staff, lokasi, status,
                   atau catatan.
@@ -1220,13 +1220,13 @@ function BinToBinPage({
                     {loading ? (
                       <tr>
                         <td className="bbt-empty-table" colSpan="9">
-                          Memuat transaksi Bin to Bin...
+                          Memuat transaksi Bin Transfer...
                         </td>
                       </tr>
                     ) : pagination.totalItems === 0 ? (
                       <tr>
                         <td className="bbt-empty-table" colSpan="9">
-                          Belum ada transaksi Bin to Bin.
+                          Belum ada transaksi Bin Transfer.
                         </td>
                       </tr>
                     ) : (
